@@ -15,6 +15,7 @@ build
 
 # Wrangler / Cloudflare
 .wrangler
+/apps/worker/wrangler.ci.toml
 .dev.vars*
 !.dev.vars.example
 .env

@@ -190,10 +190,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Keep the workspace clean: write a temp config file instead of modifying the repo.
           # IMPORTANT: writing to $GITHUB_ENV only affects *subsequent steps*.
           # We also export it for the python process in this step.
-          WRANGLER_CI_CONFIG="$RUNNER_TEMP/wrangler.ci.toml"
+          # Use $GITHUB_WORKSPACE so relative paths in wrangler config (e.g. `main = "src/index.ts"`)
+          # resolve correctly when Wrangler reads this config.
+          WRANGLER_CI_CONFIG="$GITHUB_WORKSPACE/apps/worker/wrangler.ci.toml"
           echo "WRANGLER_CI_CONFIG=$WRANGLER_CI_CONFIG" >> "$GITHUB_ENV"
           export WRANGLER_CI_CONFIG
 
@@ -281,8 +282,14 @@ jobs:
         run: |
           set -euo pipefail
           # Capture output so we can derive workers.dev URL for the web build (optional).
+          set +e
           deploy_out="$(pnpm exec wrangler deploy --config "$WRANGLER_CI_CONFIG" --keep-vars 2>&1)"
+          deploy_code="$?"
+          set -e
           echo "$deploy_out"
+          if [[ "$deploy_code" -ne 0 ]]; then
+            exit "$deploy_code"
+          fi
 
           # Best-effort parse; if it fails we can still use a user-provided API base.
           worker_url="$(echo "$deploy_out" | grep -oE 'https://[^ ]+\\.workers\\.dev' | head -n1 || true)"
