@@ -71,7 +71,7 @@ export function MonitorForm({ monitor, onSubmit, onCancel, isLoading, error }: M
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Interval (sec)</label>
           <input type="number" value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value))} min={60} className={inputClass} />

@@ -70,7 +70,7 @@ export function MaintenanceWindowForm(props: CreateProps | EditProps) {
         <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="e.g. Database maintenance" required />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Starts</label>
           <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className={inputClass} required />

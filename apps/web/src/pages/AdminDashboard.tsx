@@ -85,32 +85,32 @@ export function AdminDashboard() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-slate-900">Admin Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <Link to="/admin/analytics" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Analytics</Link>
-            <Link to="/" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Status Page</Link>
-            <button onClick={logout} className="text-sm text-red-500 hover:text-red-700 transition-colors">Logout</button>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900">Admin Dashboard</h1>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Link to="/admin/analytics" className="text-sm text-slate-500 hover:text-slate-900 transition-colors px-2 py-1.5 rounded-lg active:bg-slate-100">Analytics</Link>
+            <Link to="/" className="text-sm text-slate-500 hover:text-slate-900 transition-colors px-2 py-1.5 rounded-lg active:bg-slate-100">Status</Link>
+            <button onClick={logout} className="text-sm text-red-500 hover:text-red-700 transition-colors px-2 py-1.5 rounded-lg active:bg-red-50">Logout</button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 pt-6">
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg overflow-x-auto scrollbar-hide">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${tab === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${tab === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={t.icon} /></svg>
-              {t.label}
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={t.icon} /></svg>
+              <span className="hidden xs:inline sm:inline">{t.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {tab === 'monitors' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -125,35 +125,37 @@ export function AdminDashboard() {
                 <div className="text-sm text-slate-500">{formatError(monitorsQuery.error) ?? 'Unknown error'}</div>
               </Card>
             ) : !monitorsQuery.data?.monitors.length ? (
-              <Card className="p-8 text-center text-slate-500">No monitors yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500">No monitors yet</Card>
             ) : (
               <Card className="overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Target</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {monitorsQuery.data.monitors.map((m) => (
-                      <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900">{m.name}</td>
-                        <td className="px-4 py-3"><Badge variant="info">{m.type}</Badge></td>
-                        <td className="px-4 py-3 text-sm text-slate-500 truncate max-w-xs">{m.target}</td>
-                        <td className="px-4 py-3"><Badge variant={m.is_active ? 'up' : 'unknown'}>{m.is_active ? 'Active' : 'Paused'}</Badge></td>
-                        <td className="px-4 py-3 text-right space-x-2">
-                          <button onClick={() => { setTestingMonitorId(m.id); testMonitorMut.mutate(m.id); }} disabled={testingMonitorId === m.id} className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50">{testingMonitorId === m.id ? 'Testing...' : 'Test'}</button>
-                          <button onClick={() => { createMonitorMut.reset(); updateMonitorMut.reset(); setModal({ type: 'edit-monitor', monitor: m }); }} className="text-sm text-slate-600 hover:text-slate-900">Edit</button>
-                          <button onClick={() => confirm('Delete?') && deleteMonitorMut.mutate(m.id)} className="text-sm text-red-500 hover:text-red-700">Delete</button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Name</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Type</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Target</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {monitorsQuery.data.monitors.map((m) => (
+                        <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900">{m.name}</td>
+                          <td className="px-3 sm:px-4 py-3"><Badge variant="info">{m.type}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 truncate max-w-[200px]">{m.target}</td>
+                          <td className="px-3 sm:px-4 py-3"><Badge variant={m.is_active ? 'up' : 'unknown'}>{m.is_active ? 'Active' : 'Paused'}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
+                            <button onClick={() => { setTestingMonitorId(m.id); testMonitorMut.mutate(m.id); }} disabled={testingMonitorId === m.id} className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 px-1.5 py-1">{testingMonitorId === m.id ? 'Testing...' : 'Test'}</button>
+                            <button onClick={() => { createMonitorMut.reset(); updateMonitorMut.reset(); setModal({ type: 'edit-monitor', monitor: m }); }} className="text-sm text-slate-600 hover:text-slate-900 px-1.5 py-1">Edit</button>
+                            <button onClick={() => confirm('Delete?') && deleteMonitorMut.mutate(m.id)} className="text-sm text-red-500 hover:text-red-700 px-1.5 py-1">Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Card>
             )}
           </div>
@@ -168,32 +170,34 @@ export function AdminDashboard() {
             {channelsQuery.isLoading ? (
               <div className="text-slate-500">Loading...</div>
             ) : !channelsQuery.data?.notification_channels.length ? (
-              <Card className="p-8 text-center text-slate-500">No channels yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500">No channels yet</Card>
             ) : (
               <Card className="overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">URL</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {channelsQuery.data.notification_channels.map((ch) => (
-                      <tr key={ch.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900">{ch.name}</td>
-                        <td className="px-4 py-3"><Badge variant="info">{ch.type}</Badge></td>
-                        <td className="px-4 py-3 text-sm text-slate-500 truncate max-w-xs">{ch.config_json.url}</td>
-                        <td className="px-4 py-3 text-right space-x-2">
-                          <button onClick={() => { setTestingChannelId(ch.id); testChannelMut.mutate(ch.id); }} disabled={testingChannelId === ch.id} className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50">{testingChannelId === ch.id ? 'Testing...' : 'Test'}</button>
-                          <button onClick={() => setModal({ type: 'edit-channel', channel: ch })} className="text-sm text-slate-600 hover:text-slate-900">Edit</button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[500px]">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Name</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Type</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">URL</th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {channelsQuery.data.notification_channels.map((ch) => (
+                        <tr key={ch.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900">{ch.name}</td>
+                          <td className="px-3 sm:px-4 py-3"><Badge variant="info">{ch.type}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 truncate max-w-[200px]">{ch.config_json.url}</td>
+                          <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
+                            <button onClick={() => { setTestingChannelId(ch.id); testChannelMut.mutate(ch.id); }} disabled={testingChannelId === ch.id} className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 px-1.5 py-1">{testingChannelId === ch.id ? 'Testing...' : 'Test'}</button>
+                            <button onClick={() => setModal({ type: 'edit-channel', channel: ch })} className="text-sm text-slate-600 hover:text-slate-900 px-1.5 py-1">Edit</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Card>
             )}
           </div>
@@ -208,35 +212,37 @@ export function AdminDashboard() {
             {incidentsQuery.isLoading ? (
               <div className="text-slate-500">Loading...</div>
             ) : !incidentsQuery.data?.incidents.length ? (
-              <Card className="p-8 text-center text-slate-500">No incidents yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500">No incidents yet</Card>
             ) : (
               <Card className="overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Title</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Monitors</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Impact</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {incidentsQuery.data.incidents.map((it) => (
-                      <tr key={it.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-slate-900">{it.title}</td>
-                        <td className="px-4 py-3 text-sm text-slate-500">{it.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}</td>
-                        <td className="px-4 py-3"><Badge variant={it.status === 'resolved' ? 'up' : 'paused'}>{it.status}</Badge></td>
-                        <td className="px-4 py-3"><Badge variant={it.impact === 'critical' ? 'down' : it.impact === 'major' ? 'down' : 'paused'}>{it.impact}</Badge></td>
-                        <td className="px-4 py-3 text-right space-x-2">
-                          <button onClick={() => setModal({ type: 'add-incident-update', incident: it })} disabled={it.status === 'resolved'} className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50">Update</button>
-                          <button onClick={() => setModal({ type: 'resolve-incident', incident: it })} disabled={it.status === 'resolved'} className="text-sm text-emerald-600 hover:text-emerald-800 disabled:opacity-50">Resolve</button>
-                          <button onClick={() => confirm(`Delete "${it.title}"?`) && deleteIncidentMut.mutate(it.id)} className="text-sm text-red-500 hover:text-red-700">Delete</button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Title</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Monitors</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Status</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Impact</th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {incidentsQuery.data.incidents.map((it) => (
+                        <tr key={it.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900">{it.title}</td>
+                          <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 truncate max-w-[150px]">{it.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}</td>
+                          <td className="px-3 sm:px-4 py-3"><Badge variant={it.status === 'resolved' ? 'up' : 'paused'}>{it.status}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3"><Badge variant={it.impact === 'critical' ? 'down' : it.impact === 'major' ? 'down' : 'paused'}>{it.impact}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
+                            <button onClick={() => setModal({ type: 'add-incident-update', incident: it })} disabled={it.status === 'resolved'} className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 px-1.5 py-1">Update</button>
+                            <button onClick={() => setModal({ type: 'resolve-incident', incident: it })} disabled={it.status === 'resolved'} className="text-sm text-emerald-600 hover:text-emerald-800 disabled:opacity-50 px-1.5 py-1">Resolve</button>
+                            <button onClick={() => confirm(`Delete "${it.title}"?`) && deleteIncidentMut.mutate(it.id)} className="text-sm text-red-500 hover:text-red-700 px-1.5 py-1">Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Card>
             )}
           </div>
@@ -251,38 +257,40 @@ export function AdminDashboard() {
             {maintenanceQuery.isLoading ? (
               <div className="text-slate-500">Loading...</div>
             ) : !maintenanceQuery.data?.maintenance_windows.length ? (
-              <Card className="p-8 text-center text-slate-500">No maintenance windows yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500">No maintenance windows yet</Card>
             ) : (
               <Card className="overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Title</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Monitors</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Schedule</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">State</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {maintenanceQuery.data.maintenance_windows.map((w) => {
-                      const now = Math.floor(Date.now() / 1000);
-                      const state = w.starts_at <= now && w.ends_at > now ? 'Active' : w.starts_at > now ? 'Upcoming' : 'Ended';
-                      return (
-                        <tr key={w.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-sm font-medium text-slate-900">{w.title}</td>
-                          <td className="px-4 py-3 text-sm text-slate-500">{w.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">{new Date(w.starts_at * 1000).toLocaleString()} – {new Date(w.ends_at * 1000).toLocaleString()}</td>
-                          <td className="px-4 py-3"><Badge variant={state === 'Active' ? 'maintenance' : state === 'Upcoming' ? 'paused' : 'unknown'}>{state}</Badge></td>
-                          <td className="px-4 py-3 text-right space-x-2">
-                            <button onClick={() => setModal({ type: 'edit-maintenance', window: w })} className="text-sm text-slate-600 hover:text-slate-900">Edit</button>
-                            <button onClick={() => confirm(`Delete "${w.title}"?`) && deleteMaintenanceMut.mutate(w.id)} className="text-sm text-red-500 hover:text-red-700">Delete</button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[650px]">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Title</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Monitors</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">Schedule</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">State</th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wide">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {maintenanceQuery.data.maintenance_windows.map((w) => {
+                        const now = Math.floor(Date.now() / 1000);
+                        const state = w.starts_at <= now && w.ends_at > now ? 'Active' : w.starts_at > now ? 'Upcoming' : 'Ended';
+                        return (
+                          <tr key={w.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900">{w.title}</td>
+                            <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 truncate max-w-[120px]">{w.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}</td>
+                            <td className="px-3 sm:px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{new Date(w.starts_at * 1000).toLocaleString()} – {new Date(w.ends_at * 1000).toLocaleString()}</td>
+                            <td className="px-3 sm:px-4 py-3"><Badge variant={state === 'Active' ? 'maintenance' : state === 'Upcoming' ? 'paused' : 'unknown'}>{state}</Badge></td>
+                            <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
+                              <button onClick={() => setModal({ type: 'edit-maintenance', window: w })} className="text-sm text-slate-600 hover:text-slate-900 px-1.5 py-1">Edit</button>
+                              <button onClick={() => confirm(`Delete "${w.title}"?`) && deleteMaintenanceMut.mutate(w.id)} className="text-sm text-red-500 hover:text-red-700 px-1.5 py-1">Delete</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </Card>
             )}
           </div>
@@ -290,8 +298,8 @@ export function AdminDashboard() {
       </main>
 
       {modal.type !== 'none' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-soft-lg max-w-md w-full p-6 animate-slide-up">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-soft-lg w-full sm:max-w-md p-5 sm:p-6 max-h-[90vh] overflow-y-auto animate-slide-up">
             <h2 className="text-lg font-semibold text-slate-900 mb-5">
               {modal.type === 'create-monitor' && 'Create Monitor'}
               {modal.type === 'edit-monitor' && 'Edit Monitor'}

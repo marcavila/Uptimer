@@ -80,33 +80,33 @@ export function AdminAnalytics() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
-          <div className="flex gap-4">
-            <Link to="/admin" className="text-sm text-gray-600 hover:text-gray-900">
+        <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4 flex justify-between items-center">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900">Analytics</h1>
+          <div className="flex gap-2 sm:gap-4">
+            <Link to="/admin" className="text-sm text-gray-600 hover:text-gray-900 px-2 py-1.5 rounded-lg active:bg-gray-100">
               Dashboard
             </Link>
-            <Link to="/" className="text-sm text-gray-600 hover:text-gray-900">
-              Status Page
+            <Link to="/" className="text-sm text-gray-600 hover:text-gray-900 px-2 py-1.5 rounded-lg active:bg-gray-100">
+              Status
             </Link>
-            <button onClick={logout} className="text-sm text-red-600 hover:text-red-800">
+            <button onClick={logout} className="text-sm text-red-600 hover:text-red-800 px-2 py-1.5 rounded-lg active:bg-red-50">
               Logout
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-10">
+      <main className="max-w-6xl mx-auto px-4 py-4 sm:py-6 space-y-6 sm:space-y-10">
         {/* Overview */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between gap-4">
+        <section className="bg-white rounded-lg shadow p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <h2 className="text-lg font-semibold">Overview</h2>
             <div className="flex gap-2">
               {(['24h', '7d'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => setOverviewRange(r)}
-                  className={`px-3 py-1 rounded text-sm ${overviewRange === r ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-3 py-1.5 rounded text-sm ${overviewRange === r ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
                 >
                   {r}
                 </button>
@@ -141,7 +141,7 @@ export function AdminAnalytics() {
         </section>
 
         {/* Monitor */}
-        <section className="bg-white rounded-lg shadow p-6 space-y-6">
+        <section className="bg-white rounded-lg shadow p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <h2 className="text-lg font-semibold">Monitor</h2>
 
@@ -225,8 +225,8 @@ export function AdminAnalytics() {
                 </div>
               </div>
 
-              <div className="border rounded p-4">
-                <div className="flex items-center justify-between">
+              <div className="border rounded p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="text-sm font-medium">Outages</div>
                   {selectedMonitor && (
                     <div className="text-xs text-gray-500">
@@ -241,7 +241,7 @@ export function AdminAnalytics() {
                   <div className="mt-3 text-gray-500">No outages in this range</div>
                 ) : (
                   <div className="mt-3 overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm min-w-[500px]">
                       <thead className="text-xs text-gray-500">
                         <tr>
                           <th className="text-left py-2 pr-4">Start</th>

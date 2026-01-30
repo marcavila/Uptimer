@@ -52,12 +52,12 @@ function MonitorCard({ monitor, onSelect }: { monitor: PublicMonitor; onSelect: 
   const uptimePercent = totalCount > 0 ? ((upCount / totalCount) * 100).toFixed(1) : null;
 
   return (
-    <Card hover onClick={onSelect} className="p-5">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
+    <Card hover onClick={onSelect} className="p-4 sm:p-5">
+      <div className="flex items-start justify-between mb-3 sm:mb-4">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <StatusDot status={monitor.status} pulse={monitor.status === 'down'} />
-          <div>
-            <h3 className="font-semibold text-slate-900">{monitor.name}</h3>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-900 truncate">{monitor.name}</h3>
             <span className="text-xs text-slate-500 uppercase tracking-wide">{monitor.type}</span>
           </div>
         </div>
@@ -68,8 +68,8 @@ function MonitorCard({ monitor, onSelect }: { monitor: PublicMonitor; onSelect: 
 
       <HeartbeatBar heartbeats={monitor.heartbeats} />
 
-      <div className="mt-4 flex items-center justify-between text-sm">
-        <div className="flex items-center gap-4">
+      <div className="mt-3 sm:mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div className="flex items-center gap-3 sm:gap-4">
           {uptimePercent && (
             <span className="text-slate-600">
               <span className="font-medium text-emerald-600">{uptimePercent}%</span> uptime
@@ -97,11 +97,11 @@ function MonitorDetail({ monitorId, onClose }: { monitorId: number; onClose: () 
 
   return (
     <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-soft-lg max-w-2xl w-full p-6 animate-slide-up"
+        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-soft-lg w-full sm:max-w-2xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
@@ -286,11 +286,11 @@ export function StatusPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-100">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-slate-900">Uptimer</h1>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900">Uptimer</h1>
           <Link
             to="/admin"
-            className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+            className="text-sm text-slate-500 hover:text-slate-900 transition-colors px-3 py-1.5 -mr-3 rounded-lg active:bg-slate-100"
           >
             Admin
           </Link>
@@ -299,16 +299,16 @@ export function StatusPage() {
 
       {/* Status Banner */}
       <div className={`bg-gradient-to-r ${bannerConfig.bg} text-white`}>
-        <div className="max-w-5xl mx-auto px-6 py-12 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/20 text-2xl mb-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 text-center">
+          <div className="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 text-xl sm:text-2xl mb-3 sm:mb-4">
             {bannerConfig.icon}
           </div>
-          <h2 className="text-2xl font-bold mb-2">{bannerConfig.text}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-2">{bannerConfig.text}</h2>
           {data.banner.source === 'incident' && data.banner.incident && (
-            <p className="text-white/80 text-sm">Incident: {data.banner.incident.title}</p>
+            <p className="text-white/80 text-sm px-4">Incident: {data.banner.incident.title}</p>
           )}
           {data.banner.source === 'maintenance' && data.banner.maintenance_window && (
-            <p className="text-white/80 text-sm">Maintenance: {data.banner.maintenance_window.title}</p>
+            <p className="text-white/80 text-sm px-4">Maintenance: {data.banner.maintenance_window.title}</p>
           )}
           <p className="text-white/60 text-xs mt-3">
             Last updated: {new Date(data.generated_at * 1000).toLocaleString()}
@@ -316,7 +316,7 @@ export function StatusPage() {
         </div>
       </div>
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {/* Maintenance Windows */}
         {(data.maintenance_windows.active.length > 0 || data.maintenance_windows.upcoming.length > 0) && (
           <section className="mb-10">
@@ -333,10 +333,10 @@ export function StatusPage() {
                 <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Active</div>
                 <div className="space-y-3">
                   {data.maintenance_windows.active.map((w) => (
-                    <Card key={w.id} className="p-5 border-l-4 border-l-blue-500">
-                      <div className="flex items-start justify-between gap-4 mb-2">
+                    <Card key={w.id} className="p-4 sm:p-5 border-l-4 border-l-blue-500">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-2">
                         <h4 className="font-semibold text-slate-900">{w.title}</h4>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-slate-500 whitespace-nowrap">
                           {new Date(w.starts_at * 1000).toLocaleString()} – {new Date(w.ends_at * 1000).toLocaleString()}
                         </span>
                       </div>
@@ -355,10 +355,10 @@ export function StatusPage() {
                 <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Upcoming</div>
                 <div className="space-y-3">
                   {data.maintenance_windows.upcoming.map((w) => (
-                    <Card key={w.id} className="p-5 border-l-4 border-l-slate-300">
-                      <div className="flex items-start justify-between gap-4 mb-2">
+                    <Card key={w.id} className="p-4 sm:p-5 border-l-4 border-l-slate-300">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-2">
                         <h4 className="font-semibold text-slate-900">{w.title}</h4>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-slate-500 whitespace-nowrap">
                           {new Date(w.starts_at * 1000).toLocaleString()} – {new Date(w.ends_at * 1000).toLocaleString()}
                         </span>
                       </div>
@@ -393,7 +393,7 @@ export function StatusPage() {
         {/* Monitors */}
         <section>
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Services</h3>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {data.monitors.map((monitor) => (
               <MonitorCard
                 key={monitor.id}
@@ -412,7 +412,7 @@ export function StatusPage() {
 
       {/* Footer */}
       <footer className="border-t border-slate-100 bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-6 text-center text-sm text-slate-400">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 text-center text-sm text-slate-400">
           Powered by Uptimer
         </div>
       </footer>

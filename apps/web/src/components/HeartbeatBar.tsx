@@ -79,11 +79,11 @@ export function HeartbeatBar({ heartbeats, maxBars = 60 }: HeartbeatBarProps) {
 
   return (
     <>
-      <div className="flex gap-[3px] h-8 items-end">
+      <div className="flex gap-[2px] sm:gap-[3px] h-6 sm:h-8 items-end">
         {reversed.map((hb, idx) => (
           <div
             key={idx}
-            className={`flex-1 min-w-[4px] max-w-[8px] rounded-sm transition-all duration-150 cursor-pointer
+            className={`flex-1 min-w-[3px] sm:min-w-[4px] max-w-[6px] sm:max-w-[8px] rounded-sm transition-all duration-150 cursor-pointer
               ${getStatusColor(hb.status)}
               hover:scale-y-110 hover:shadow-md ${tooltip?.heartbeat === hb ? getStatusGlow(hb.status) : ''}`}
             style={{ height: hb.status === 'up' ? '100%' : hb.status === 'down' ? '100%' : '60%' }}
@@ -95,7 +95,7 @@ export function HeartbeatBar({ heartbeats, maxBars = 60 }: HeartbeatBarProps) {
           Array.from({ length: maxBars - reversed.length }).map((_, idx) => (
             <div
               key={`empty-${idx}`}
-              className="flex-1 min-w-[4px] max-w-[8px] h-[60%] rounded-sm bg-slate-200"
+              className="flex-1 min-w-[3px] sm:min-w-[4px] max-w-[6px] sm:max-w-[8px] h-[60%] rounded-sm bg-slate-200"
             />
           ))}
       </div>
