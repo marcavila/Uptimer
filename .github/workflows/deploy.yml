@@ -326,7 +326,7 @@ jobs:
           set -euo pipefail
 
           set +e
-          output="$(pnpm -C apps/worker exec wrangler pages project create "$PAGES_PROJECT" --production-branch "$DEFAULT_BRANCH" 2>&1)"
+          output="$(pnpm -C apps/worker exec wrangler --cwd ../.. pages project create "$PAGES_PROJECT" --production-branch "$DEFAULT_BRANCH" 2>&1)"
           code="$?"
           set -e
 
@@ -341,7 +341,7 @@ jobs:
           fi
 
           # Fallback: if the error message format changes, verify via listing.
-          if pnpm exec wrangler pages project list 2>/dev/null | grep -q "$PAGES_PROJECT"; then
+          if pnpm -C apps/worker exec wrangler --cwd ../.. pages project list 2>/dev/null | grep -q "$PAGES_PROJECT"; then
             echo "Pages project already exists: $PAGES_PROJECT"
             exit 0
           fi
@@ -353,7 +353,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm -C apps/worker exec wrangler pages deploy apps/web/dist \
+          pnpm -C apps/worker exec wrangler --cwd ../.. pages deploy apps/web/dist \
             --project-name "$PAGES_PROJECT" \
             --branch "$DEFAULT_BRANCH" \
             --commit-hash "$GITHUB_SHA" \
