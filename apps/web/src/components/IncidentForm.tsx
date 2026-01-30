@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
-
 import type { CreateIncidentInput, IncidentImpact, IncidentStatus } from '../api/types';
 import { Markdown } from './Markdown';
+import { Button } from './ui';
 
 const impactOptions: IncidentImpact[] = ['none', 'minor', 'major', 'critical'];
 const statusOptions: Array<Exclude<IncidentStatus, 'resolved'>> = ['investigating', 'identified', 'monitoring'];
+
+const inputClass = 'w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-colors';
+const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
 
 export function IncidentForm({
   monitors,
@@ -27,125 +30,77 @@ export function IncidentForm({
 
   return (
     <form
-      className="space-y-4"
+      className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        const monitor_ids = selectedMonitorIds;
-        if (monitor_ids.length === 0) return;
-        const base: CreateIncidentInput = {
-          title: title.trim(),
-          impact,
-          status,
-          monitor_ids,
-        };
+        if (selectedMonitorIds.length === 0) return;
+        const base: CreateIncidentInput = { title: title.trim(), impact, status, monitor_ids: selectedMonitorIds };
         onSubmit(normalized.length > 0 ? { ...base, message: normalized } : base);
       }}
     >
       <div>
-        <div className="text-sm font-medium text-gray-700 mb-2">Affected Monitors</div>
+        <div className={labelClass}>Affected Monitors</div>
         {monitors.length === 0 ? (
-          <div className="text-sm text-gray-500">No monitors available</div>
+          <div className="text-sm text-slate-500">No monitors available</div>
         ) : (
-          <div className="max-h-40 overflow-y-auto border rounded p-2 space-y-1">
-            {monitors.map((m) => {
-              const checked = selectedMonitorIds.includes(m.id);
-              return (
-                <label key={m.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      const next = e.target.checked
-                        ? [...selectedMonitorIds, m.id]
-                        : selectedMonitorIds.filter((id) => id !== m.id);
-                      setSelectedMonitorIds(next);
-                    }}
-                  />
-                  <span>{m.name}</span>
-                </label>
-              );
-            })}
+          <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2">
+            {monitors.map((m) => (
+              <label key={m.id} className="flex items-center gap-2.5 text-sm cursor-pointer hover:text-slate-900">
+                <input
+                  type="checkbox"
+                  checked={selectedMonitorIds.includes(m.id)}
+                  onChange={(e) => setSelectedMonitorIds(e.target.checked ? [...selectedMonitorIds, m.id] : selectedMonitorIds.filter((id) => id !== m.id))}
+                  className="rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                />
+                <span>{m.name}</span>
+              </label>
+            ))}
           </div>
         )}
         {monitors.length > 0 && selectedMonitorIds.length === 0 && (
-          <div className="mt-2 text-sm text-red-600">Select at least one monitor</div>
+          <div className="mt-2 text-sm text-red-500">Select at least one monitor</div>
         )}
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full border rounded px-3 py-2 text-sm"
-          placeholder="e.g. API latency issues"
-          required
-        />
+        <label className={labelClass}>Title</label>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="e.g. API latency issues" required />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Impact</label>
-          <select
-            value={impact}
-            onChange={(e) => setImpact(e.target.value as IncidentImpact)}
-            className="w-full border rounded px-3 py-2 text-sm"
-          >
-            {impactOptions.map((it) => (
-              <option key={it} value={it}>
-                {it}
-              </option>
-            ))}
+          <label className={labelClass}>Impact</label>
+          <select value={impact} onChange={(e) => setImpact(e.target.value as IncidentImpact)} className={inputClass}>
+            {impactOptions.map((it) => <option key={it} value={it}>{it}</option>)}
           </select>
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as Exclude<IncidentStatus, 'resolved'>)}
-            className="w-full border rounded px-3 py-2 text-sm"
-          >
-            {statusOptions.map((it) => (
-              <option key={it} value={it}>
-                {it}
-              </option>
-            ))}
+          <label className={labelClass}>Status</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value as Exclude<IncidentStatus, 'resolved'>)} className={inputClass}>
+            {statusOptions.map((it) => <option key={it} value={it}>{it}</option>)}
           </select>
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Message (Markdown)</label>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={6}
-          className="w-full border rounded px-3 py-2 text-sm font-mono"
-          placeholder="Describe the issue and current mitigation..."
-        />
+        <label className={labelClass}>Message (Markdown)</label>
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} className={`${inputClass} font-mono`} placeholder="Describe the issue..." />
       </div>
 
       {normalized.length > 0 && (
         <div>
-          <div className="text-sm font-medium text-gray-700 mb-1">Preview</div>
-          <div className="border rounded p-3 bg-gray-50">
+          <div className={labelClass}>Preview</div>
+          <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
             <Markdown text={normalized} />
           </div>
         </div>
       )}
 
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm border rounded-md">
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading || title.trim().length === 0 || selectedMonitorIds.length === 0}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md disabled:opacity-50"
-        >
+      <div className="flex gap-3 pt-2">
+        <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">Cancel</Button>
+        <Button type="submit" disabled={isLoading || !title.trim() || selectedMonitorIds.length === 0} className="flex-1">
           {isLoading ? 'Saving...' : 'Create'}
-        </button>
+        </Button>
       </div>
     </form>
   );

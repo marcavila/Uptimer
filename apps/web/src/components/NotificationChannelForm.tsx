@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { NotificationChannel, CreateNotificationChannelInput } from '../api/types';
+import { Button } from './ui';
 
 interface NotificationChannelFormProps {
   channel?: NotificationChannel | undefined;
@@ -8,77 +9,44 @@ interface NotificationChannelFormProps {
   isLoading?: boolean;
 }
 
-export function NotificationChannelForm({
-  channel,
-  onSubmit,
-  onCancel,
-  isLoading,
-}: NotificationChannelFormProps) {
+const inputClass = 'w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-colors';
+const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
+
+export function NotificationChannelForm({ channel, onSubmit, onCancel, isLoading }: NotificationChannelFormProps) {
   const [name, setName] = useState(channel?.name ?? '');
   const [url, setUrl] = useState(channel?.config_json.url ?? '');
   const [method, setMethod] = useState(channel?.config_json.method ?? 'POST');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      name,
-      type: 'webhook',
-      config_json: { url, method },
-    });
+    onSubmit({ name, type: 'webhook', config_json: { url, method } });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md"
-          required
-        />
+        <label className={labelClass}>Name</label>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} required />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com/webhook"
-          className="w-full px-3 py-2 border rounded-md"
-          required
-        />
+        <label className={labelClass}>Webhook URL</label>
+        <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/webhook" className={inputClass} required />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Method</label>
-        <select
-          value={method}
-          onChange={(e) => setMethod(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md"
-        >
+        <label className={labelClass}>Method</label>
+        <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass}>
           <option value="POST">POST</option>
           <option value="GET">GET</option>
         </select>
       </div>
 
-      <div className="flex gap-2 pt-4">
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
+      <div className="flex gap-3 pt-2">
+        <Button type="submit" disabled={isLoading} className="flex-1">
           {isLoading ? 'Saving...' : channel ? 'Update' : 'Create'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-md hover:bg-gray-300"
-        >
-          Cancel
-        </button>
+        </Button>
+        <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">Cancel</Button>
       </div>
     </form>
   );

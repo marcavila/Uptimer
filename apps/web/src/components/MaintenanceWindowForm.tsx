@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-
 import type { CreateMaintenanceWindowInput, MaintenanceWindow, PatchMaintenanceWindowInput } from '../api/types';
 import { Markdown } from './Markdown';
+import { Button } from './ui';
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -20,27 +20,15 @@ function fromDatetimeLocal(value: string): number | null {
   return Math.floor(ms / 1000);
 }
 
-type CommonProps = {
-  onCancel: () => void;
-  isLoading?: boolean;
-  monitors: Array<{ id: number; name: string }>;
-};
+const inputClass = 'w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-colors';
+const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
 
-type CreateProps = CommonProps & {
-  window?: undefined;
-  onSubmit: (input: CreateMaintenanceWindowInput) => void;
-};
-
-type EditProps = CommonProps & {
-  window: MaintenanceWindow;
-  onSubmit: (input: PatchMaintenanceWindowInput) => void;
-};
+type CommonProps = { onCancel: () => void; isLoading?: boolean; monitors: Array<{ id: number; name: string }> };
+type CreateProps = CommonProps & { window?: undefined; onSubmit: (input: CreateMaintenanceWindowInput) => void };
+type EditProps = CommonProps & { window: MaintenanceWindow; onSubmit: (input: PatchMaintenanceWindowInput) => void };
 
 export function MaintenanceWindowForm(props: CreateProps | EditProps) {
-  const window = props.window;
-  const onCancel = props.onCancel;
-  const isLoading = props.isLoading;
-  const monitors = props.monitors;
+  const { window, onCancel, isLoading, monitors } = props;
 
   const [title, setTitle] = useState(window?.title ?? '');
   const [message, setMessage] = useState(window?.message ?? '');
@@ -49,150 +37,68 @@ export function MaintenanceWindowForm(props: CreateProps | EditProps) {
   const [selectedMonitorIds, setSelectedMonitorIds] = useState<number[]>(window?.monitor_ids ?? []);
 
   const normalized = useMemo(() => message.trim(), [message]);
+  const parsed = useMemo(() => ({ starts_at: fromDatetimeLocal(startsAt), ends_at: fromDatetimeLocal(endsAt) }), [startsAt, endsAt]);
 
-  const parsed = useMemo(() => {
-    const s = fromDatetimeLocal(startsAt);
-    const e = fromDatetimeLocal(endsAt);
-    return { starts_at: s, ends_at: e };
-  }, [startsAt, endsAt]);
-
-  const timeError =
-    parsed.starts_at === null || parsed.ends_at === null
-      ? 'Start/end time is required'
-      : parsed.starts_at >= parsed.ends_at
-        ? 'Start time must be earlier than end time'
-        : null;
-
-  const monitorsError =
-    monitors.length === 0
-      ? 'No monitors available'
-      : selectedMonitorIds.length === 0
-        ? 'Select at least one monitor'
-        : null;
+  const timeError = parsed.starts_at === null || parsed.ends_at === null ? 'Start/end time required' : parsed.starts_at >= parsed.ends_at ? 'Start must be before end' : null;
+  const monitorsError = monitors.length === 0 ? 'No monitors' : selectedMonitorIds.length === 0 ? 'Select at least one' : null;
 
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-
-        if (timeError || parsed.starts_at === null || parsed.ends_at === null) return;
-        if (selectedMonitorIds.length === 0) return;
-
-        const base = {
-          title: title.trim(),
-          starts_at: parsed.starts_at,
-          ends_at: parsed.ends_at,
-          monitor_ids: selectedMonitorIds,
-        };
-
-        if (props.window) {
-          props.onSubmit({ ...base, message: normalized.length > 0 ? normalized : null });
-        } else {
-          props.onSubmit(normalized.length > 0 ? { ...base, message: normalized } : base);
-        }
-      }}
-    >
+    <form className="space-y-5" onSubmit={(e) => {
+      e.preventDefault();
+      if (timeError || parsed.starts_at === null || parsed.ends_at === null || selectedMonitorIds.length === 0) return;
+      const base = { title: title.trim(), starts_at: parsed.starts_at, ends_at: parsed.ends_at, monitor_ids: selectedMonitorIds };
+      if (props.window) props.onSubmit({ ...base, message: normalized || null });
+      else props.onSubmit(normalized ? { ...base, message: normalized } : base);
+    }}>
       <div>
-        <div className="text-sm font-medium text-gray-700 mb-2">Affected Monitors</div>
-        {monitors.length === 0 ? (
-          <div className="text-sm text-gray-500">No monitors available</div>
-        ) : (
-          <div className="max-h-40 overflow-y-auto border rounded p-2 space-y-1">
-            {monitors.map((m) => {
-              const checked = selectedMonitorIds.includes(m.id);
-              return (
-                <label key={m.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      const next = e.target.checked
-                        ? [...selectedMonitorIds, m.id]
-                        : selectedMonitorIds.filter((id) => id !== m.id);
-                      setSelectedMonitorIds(next);
-                    }}
-                  />
-                  <span>{m.name}</span>
-                </label>
-              );
-            })}
+        <div className={labelClass}>Affected Monitors</div>
+        {monitors.length === 0 ? <div className="text-sm text-slate-500">No monitors</div> : (
+          <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2">
+            {monitors.map((m) => (
+              <label key={m.id} className="flex items-center gap-2.5 text-sm cursor-pointer hover:text-slate-900">
+                <input type="checkbox" checked={selectedMonitorIds.includes(m.id)} onChange={(e) => setSelectedMonitorIds(e.target.checked ? [...selectedMonitorIds, m.id] : selectedMonitorIds.filter((id) => id !== m.id))} className="rounded border-slate-300" />
+                <span>{m.name}</span>
+              </label>
+            ))}
           </div>
         )}
-        {monitorsError && <div className="mt-2 text-sm text-red-600">{monitorsError}</div>}
+        {monitorsError && <div className="mt-2 text-sm text-red-500">{monitorsError}</div>}
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full border rounded px-3 py-2 text-sm"
-          placeholder="e.g. Database maintenance"
-          required
-        />
+        <label className={labelClass}>Title</label>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="e.g. Database maintenance" required />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Starts</label>
-          <input
-            type="datetime-local"
-            value={startsAt}
-            onChange={(e) => setStartsAt(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm"
-            required
-          />
+          <label className={labelClass}>Starts</label>
+          <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className={inputClass} required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ends</label>
-          <input
-            type="datetime-local"
-            value={endsAt}
-            onChange={(e) => setEndsAt(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm"
-            required
-          />
+          <label className={labelClass}>Ends</label>
+          <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className={inputClass} required />
         </div>
       </div>
-
-      {timeError && <div className="text-sm text-red-600">{timeError}</div>}
-
-      <div className="text-xs text-gray-500">
-        Unix seconds: start={parsed.starts_at ?? '-'}, end={parsed.ends_at ?? '-'}
-      </div>
+      {timeError && <div className="text-sm text-red-500">{timeError}</div>}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Message (Markdown, optional)</label>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={5}
-          className="w-full border rounded px-3 py-2 text-sm font-mono"
-          placeholder="Optional maintenance details..."
-        />
+        <label className={labelClass}>Message (Markdown)</label>
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} className={`${inputClass} font-mono`} placeholder="Optional details..." />
       </div>
 
-      {normalized.length > 0 && (
+      {normalized && (
         <div>
-          <div className="text-sm font-medium text-gray-700 mb-1">Preview</div>
-          <div className="border rounded p-3 bg-gray-50">
-            <Markdown text={normalized} />
-          </div>
+          <div className={labelClass}>Preview</div>
+          <div className="border border-slate-200 rounded-lg p-4 bg-slate-50"><Markdown text={normalized} /></div>
         </div>
       )}
 
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm border rounded-md">
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading || title.trim().length === 0 || !!timeError || selectedMonitorIds.length === 0}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md disabled:opacity-50"
-        >
+      <div className="flex gap-3 pt-2">
+        <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">Cancel</Button>
+        <Button type="submit" disabled={isLoading || !title.trim() || !!timeError || !selectedMonitorIds.length} className="flex-1">
           {isLoading ? 'Saving...' : window ? 'Save' : 'Create'}
-        </button>
+        </Button>
       </div>
     </form>
   );
