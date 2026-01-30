@@ -191,7 +191,11 @@ jobs:
           set -euo pipefail
 
           # Keep the workspace clean: write a temp config file instead of modifying the repo.
-          echo "WRANGLER_CI_CONFIG=$RUNNER_TEMP/wrangler.ci.toml" >> "$GITHUB_ENV"
+          # IMPORTANT: writing to $GITHUB_ENV only affects *subsequent steps*.
+          # We also export it for the python process in this step.
+          WRANGLER_CI_CONFIG="$RUNNER_TEMP/wrangler.ci.toml"
+          echo "WRANGLER_CI_CONFIG=$WRANGLER_CI_CONFIG" >> "$GITHUB_ENV"
+          export WRANGLER_CI_CONFIG
 
           python3 - <<'PY'
           import os
