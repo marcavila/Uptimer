@@ -151,13 +151,26 @@ jobs:
           # Use `d1 list --json` to resolve by remote database name instead.
           resolve_id() {
             pnpm exec wrangler d1 list --json \
-              | jq -r '((.result // .) | map(select(.name == env.D1_NAME)) | .[0].uuid // .[0].id // empty)'
+              | jq -r '
+                def as_array:
+                  if type == "array" then .
+                  elif (type == "object" and (.result | type) == "array") then .result
+                  else [] end;
+                (as_array | map(select(.name == env.D1_NAME)) | .[0].uuid // .[0].id // empty)
+              '
           }
 
           D1_ID="$(resolve_id || true)"
           if [[ -z "$D1_ID" || "$D1_ID" == "null" ]]; then
             echo "Creating D1 database: $D1_NAME"
-            pnpm exec wrangler d1 create "$D1_NAME"
+            set +e
+            create_out="$(pnpm exec wrangler d1 create "$D1_NAME" 2>&1)"
+            create_code="$?"
+            set -e
+            if [[ "$create_code" -ne 0 ]] && ! echo "$create_out" | grep -qiE "already exists"; then
+              echo "$create_out"
+              exit "$create_code"
+            fi
             D1_ID="$(resolve_id || true)"
           else
             echo "D1 database exists: $D1_NAME"
