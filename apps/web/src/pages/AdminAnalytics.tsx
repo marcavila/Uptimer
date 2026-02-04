@@ -8,12 +8,14 @@ import {
   fetchAdminMonitors,
   fetchAdminMonitorAnalytics,
   fetchAdminMonitorOutages,
+  fetchAdminSettings,
 } from '../api/client';
 import type { AnalyticsOverviewRange, AnalyticsRange } from '../api/types';
 import { DailyLatencyChart } from '../components/DailyLatencyChart';
 import { DailyUptimeChart } from '../components/DailyUptimeChart';
 import { LatencyChart } from '../components/LatencyChart';
 import { ThemeToggle } from '../components/ui';
+import { formatDateTime } from '../utils/datetime';
 
 function formatPct(v: number): string {
   if (!Number.isFinite(v)) return '-';
@@ -38,6 +40,8 @@ export function AdminAnalytics() {
   const [monitorRange, setMonitorRange] = useState<AnalyticsRange>('24h');
   const [selectedMonitorId, setSelectedMonitorId] = useState<number | null>(null);
 
+  const settingsQuery = useQuery({ queryKey: ['admin-settings'], queryFn: fetchAdminSettings });
+
   const overviewQuery = useQuery({
     queryKey: ['admin-analytics-overview', overviewRange],
     queryFn: () => fetchAdminAnalyticsOverview(overviewRange),
@@ -49,6 +53,15 @@ export function AdminAnalytics() {
   });
 
   const monitors = useMemo(() => monitorsQuery.data?.monitors ?? [], [monitorsQuery.data?.monitors]);
+
+  const settings = settingsQuery.data?.settings;
+  const timeZone = settings?.site_timezone || 'UTC';
+
+  useEffect(() => {
+    if (!settings) return;
+    setOverviewRange(settings.admin_default_overview_range);
+    setMonitorRange(settings.admin_default_monitor_range);
+  }, [settings]);
 
   useEffect(() => {
     if (selectedMonitorId !== null) return;
@@ -82,7 +95,7 @@ export function AdminAnalytics() {
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       <header className="bg-white dark:bg-slate-800 shadow-sm dark:shadow-none dark:border-b dark:border-slate-700">
         <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4 flex justify-between items-center">
-          <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-slate-100">Analytics</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-slate-100">{settings?.site_title ? `${settings.site_title} · Analytics` : 'Analytics'}</h1>
           <div className="flex items-center gap-1">
             <ThemeToggle />
             <Link to="/admin" className="flex items-center justify-center h-9 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors px-3 rounded-lg">
@@ -258,8 +271,8 @@ export function AdminAnalytics() {
                       <tbody className="divide-y dark:divide-slate-600">
                         {outages.map((o) => (
                           <tr key={o.id}>
-                            <td className="py-2 pr-4 whitespace-nowrap text-slate-900 dark:text-slate-100">{new Date(o.started_at * 1000).toLocaleString()}</td>
-                            <td className="py-2 pr-4 whitespace-nowrap text-slate-900 dark:text-slate-100">{o.ended_at ? new Date(o.ended_at * 1000).toLocaleString() : 'Ongoing'}</td>
+                            <td className="py-2 pr-4 whitespace-nowrap text-slate-900 dark:text-slate-100">{formatDateTime(o.started_at, timeZone)}</td>
+                            <td className="py-2 pr-4 whitespace-nowrap text-slate-900 dark:text-slate-100">{o.ended_at ? formatDateTime(o.ended_at, timeZone) : 'Ongoing'}</td>
                             <td className="py-2 pr-4 text-gray-600 dark:text-slate-400">{o.initial_error ?? '-'}</td>
                             <td className="py-2 pr-4 text-gray-600 dark:text-slate-400">{o.last_error ?? '-'}</td>
                           </tr>

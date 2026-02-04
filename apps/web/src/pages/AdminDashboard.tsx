@@ -1,17 +1,40 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '../app/AuthContext';
 import {
   ApiError,
-  fetchAdminMonitors, createMonitor, updateMonitor, deleteMonitor, testMonitor,
-  fetchNotificationChannels, createNotificationChannel, updateNotificationChannel, testNotificationChannel, deleteNotificationChannel,
-  fetchAdminIncidents, createIncident, addIncidentUpdate, resolveIncident, deleteIncident,
-  fetchMaintenanceWindows, createMaintenanceWindow, updateMaintenanceWindow, deleteMaintenanceWindow,
-  fetchAdminUptimeRating, updateAdminUptimeRating,
+  fetchAdminMonitors,
+  createMonitor,
+  updateMonitor,
+  deleteMonitor,
+  testMonitor,
+  fetchNotificationChannels,
+  createNotificationChannel,
+  updateNotificationChannel,
+  testNotificationChannel,
+  deleteNotificationChannel,
+  fetchAdminIncidents,
+  createIncident,
+  addIncidentUpdate,
+  resolveIncident,
+  deleteIncident,
+  fetchMaintenanceWindows,
+  createMaintenanceWindow,
+  updateMaintenanceWindow,
+  deleteMaintenanceWindow,
+  fetchAdminSettings,
+  patchAdminSettings,
 } from '../api/client';
-import type { AdminMonitor, Incident, MaintenanceWindow, NotificationChannel, StatusResponse } from '../api/types';
+import type {
+  AdminMonitor,
+  AdminSettings,
+  Incident,
+  MaintenanceWindow,
+  NotificationChannel,
+  StatusResponse,
+} from '../api/types';
 import { IncidentForm } from '../components/IncidentForm';
 import { IncidentUpdateForm } from '../components/IncidentUpdateForm';
 import { MaintenanceWindowForm } from '../components/MaintenanceWindowForm';
@@ -19,8 +42,10 @@ import { MonitorForm } from '../components/MonitorForm';
 import { NotificationChannelForm } from '../components/NotificationChannelForm';
 import { ResolveIncidentForm } from '../components/ResolveIncidentForm';
 import { Badge, Button, Card, ThemeToggle } from '../components/ui';
+import { formatDateTime } from '../utils/datetime';
 
 type Tab = 'monitors' | 'notifications' | 'incidents' | 'maintenance' | 'settings';
+
 type ModalState =
   | { type: 'none' }
   | { type: 'create-monitor' }
@@ -34,11 +59,31 @@ type ModalState =
   | { type: 'edit-maintenance'; window: MaintenanceWindow };
 
 const tabs: { key: Tab; label: string; icon: string }[] = [
-  { key: 'monitors', label: 'Monitors', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { key: 'notifications', label: 'Notifications', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-  { key: 'incidents', label: 'Incidents', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
-  { key: 'settings', label: 'Settings', icon: 'M11.983 1.5a1.5 1.5 0 00-1.47 1.175l-.177.686a1.5 1.5 0 01-1.043 1.043l-.686.177a1.5 1.5 0 00-.967 1.918l.3.86a1.5 1.5 0 01-.356 1.6l-.523.523a1.5 1.5 0 000 2.121l.523.523a1.5 1.5 0 01.356 1.6l-.3.86a1.5 1.5 0 00.967 1.918l.686.177a1.5 1.5 0 011.043 1.043l.177.686a1.5 1.5 0 001.918.967l.86-.3a1.5 1.5 0 011.6.356l.523.523a1.5 1.5 0 002.121 0l.523-.523a1.5 1.5 0 011.6-.356l.86.3a1.5 1.5 0 001.918-.967l.177-.686a1.5 1.5 0 011.043-1.043l.686-.177a1.5 1.5 0 00.967-1.918l-.3-.86a1.5 1.5 0 01.356-1.6l.523-.523a1.5 1.5 0 000-2.121l-.523-.523a1.5 1.5 0 01-.356-1.6l.3-.86a1.5 1.5 0 00-.967-1.918l-.686-.177a1.5 1.5 0 01-1.043-1.043l-.177-.686a1.5 1.5 0 00-1.918-.967l-.86.3a1.5 1.5 0 01-1.6-.356l-.523-.523a1.5 1.5 0 00-2.121 0l-.523.523a1.5 1.5 0 01-1.6.356l-.86-.3a1.5 1.5 0 00-1.918.967zM12 15.75a3.75 3.75 0 110-7.5 3.75 3.75 0 010 7.5z' },
-  { key: 'maintenance', label: 'Maintenance', icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' },
+  {
+    key: 'monitors',
+    label: 'Monitors',
+    icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  },
+  {
+    key: 'notifications',
+    label: 'Notifications',
+    icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+  },
+  {
+    key: 'incidents',
+    label: 'Incidents',
+    icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    icon: 'M11.983 1.5a1.5 1.5 0 00-1.47 1.175l-.177.686a1.5 1.5 0 01-1.043 1.043l-.686.177a1.5 1.5 0 00-.967 1.918l.3.86a1.5 1.5 0 01-.356 1.6l-.523.523a1.5 1.5 0 000 2.121l.523.523a1.5 1.5 0 01.356 1.6l-.3.86a1.5 1.5 0 00.967 1.918l.686.177a1.5 1.5 0 011.043 1.043l.177.686a1.5 1.5 0 001.918.967l.86-.3a1.5 1.5 0 011.6.356l.523.523a1.5 1.5 0 002.121 0l.523-.523a1.5 1.5 0 011.6-.356l.86.3a1.5 1.5 0 001.918-.967l.177-.686a1.5 1.5 0 011.043-1.043l.686-.177a1.5 1.5 0 00.967-1.918l-.3-.86a1.5 1.5 0 01.356-1.6l.523-.523a1.5 1.5 0 000-2.121l-.523-.523a1.5 1.5 0 01-.356-1.6l.3-.86a1.5 1.5 0 00-.967-1.918l-.686-.177a1.5 1.5 0 01-1.043-1.043l-.177-.686a1.5 1.5 0 00-1.918-.967l-.86.3a1.5 1.5 0 01-1.6-.356l-.523-.523a1.5 1.5 0 00-2.121 0l-.523.523a1.5 1.5 0 01-1.6.356l-.86-.3a1.5 1.5 0 00-1.918.967zM12 15.75a3.75 3.75 0 110-7.5 3.75 3.75 0 010 7.5z',
+  },
+  {
+    key: 'maintenance',
+    label: 'Maintenance',
+    icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
+  },
 ];
 
 function formatError(err: unknown): string | undefined {
@@ -46,6 +91,22 @@ function formatError(err: unknown): string | undefined {
   if (err instanceof ApiError) return `${err.code}: ${err.message}`;
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function sanitizeSiteTitle(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return 'Uptimer';
+  return trimmed.slice(0, 100);
+}
+
+function sanitizeSiteDescription(value: string): string {
+  return value.trim().slice(0, 500);
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  const n = Math.trunc(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
 }
 
 export function AdminDashboard() {
@@ -61,71 +122,65 @@ export function AdminDashboard() {
   const incidentsQuery = useQuery({ queryKey: ['admin-incidents'], queryFn: () => fetchAdminIncidents() });
   const maintenanceQuery = useQuery({ queryKey: ['admin-maintenance-windows'], queryFn: () => fetchMaintenanceWindows() });
 
-  const uptimeRatingQuery = useQuery({
-    queryKey: ['admin-settings', 'uptime-rating'],
-    queryFn: fetchAdminUptimeRating,
+  const settingsQuery = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: fetchAdminSettings,
   });
 
-  const updateUptimeRatingMut = useMutation({
-    mutationFn: (level: 1 | 2 | 3 | 4 | 5) => updateAdminUptimeRating(level),
-    onMutate: async (level) => {
-      await queryClient.cancelQueries({ queryKey: ['admin-settings', 'uptime-rating'] });
+  const settings = settingsQuery.data?.settings;
 
-      const prevRating = queryClient.getQueryData<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }>([
-        'admin-settings',
-        'uptime-rating',
-      ]);
+  const patchSettingsMut = useMutation({
+    mutationFn: (patch: Partial<AdminSettings>) => patchAdminSettings(patch),
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: ['admin-settings'] });
+      await queryClient.cancelQueries({ queryKey: ['status'] });
 
+      const prevSettings = queryClient.getQueryData<{ settings: AdminSettings }>(['admin-settings']);
       const prevStatus = queryClient.getQueryData<StatusResponse>(['status']);
 
-      // Optimistically update the setting so the select reflects the user's choice immediately
-      // (important on high-latency networks).
-      queryClient.setQueryData<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }>(
-        ['admin-settings', 'uptime-rating'],
-        { uptime_rating_level: level },
-      );
-
-      // Also update the cached public status payload so the status page can pick up the new
-      // rating level without waiting for a full refetch.
-      queryClient.setQueryData<StatusResponse>(['status'], (old) =>
-        old
-          ? {
-              ...old,
-              uptime_rating_level: level,
-              monitors: old.monitors.map((m) => ({ ...m, uptime_rating_level: level })),
-            }
-          : old,
-      );
-
-      return { prevRating, prevStatus };
-    },
-    onError: (_err, _level, ctx) => {
-      const prevRating = (
-        ctx as
-          | { prevRating?: { uptime_rating_level: 1 | 2 | 3 | 4 | 5 }; prevStatus?: StatusResponse }
-          | undefined
-      )?.prevRating;
-      const prevStatus = (
-        ctx as
-          | { prevRating?: { uptime_rating_level: 1 | 2 | 3 | 4 | 5 }; prevStatus?: StatusResponse }
-          | undefined
-      )?.prevStatus;
-
-      if (prevRating) {
-        queryClient.setQueryData(['admin-settings', 'uptime-rating'], prevRating);
+      if (prevSettings) {
+        queryClient.setQueryData<{ settings: AdminSettings }>(['admin-settings'], {
+          settings: { ...prevSettings.settings, ...patch },
+        });
       }
+
+      // Keep status page data in sync for fields used there (title + uptime rating).
       if (prevStatus) {
-        queryClient.setQueryData(['status'], prevStatus);
+        const nextSiteTitle = typeof patch.site_title === 'string' ? patch.site_title : undefined;
+        const nextRating = patch.uptime_rating_level as 1 | 2 | 3 | 4 | 5 | undefined;
+
+        queryClient.setQueryData<StatusResponse>(['status'], {
+          ...prevStatus,
+          ...(nextSiteTitle ? { site_title: nextSiteTitle } : {}),
+          ...(nextRating
+            ? {
+                uptime_rating_level: nextRating,
+                monitors: prevStatus.monitors.map((m) => ({ ...m, uptime_rating_level: nextRating })),
+              }
+            : {}),
+        });
       }
+
+      return { prevSettings, prevStatus };
+    },
+    onError: (_err, _patch, ctx) => {
+      const prevSettings = (ctx as { prevSettings?: { settings: AdminSettings } } | undefined)?.prevSettings;
+      const prevStatus = (ctx as { prevStatus?: StatusResponse } | undefined)?.prevStatus;
+
+      if (prevSettings) queryClient.setQueryData(['admin-settings'], prevSettings);
+      if (prevStatus) queryClient.setQueryData(['status'], prevStatus);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(['admin-settings', 'uptime-rating'], data);
+      queryClient.setQueryData(['admin-settings'], data);
 
-      const level = data.uptime_rating_level;
+      // Update status query cache so StatusPage header updates instantly.
+      const title = data.settings.site_title;
+      const level = data.settings.uptime_rating_level;
       queryClient.setQueryData<StatusResponse>(['status'], (old) =>
         old
           ? {
               ...old,
+              site_title: title,
               uptime_rating_level: level,
               monitors: old.monitors.map((m) => ({ ...m, uptime_rating_level: level })),
             }
@@ -133,6 +188,7 @@ export function AdminDashboard() {
       );
     },
   });
+
   const closeModal = () => setModal({ type: 'none' });
 
   const createMonitorMut = useMutation({
@@ -173,7 +229,8 @@ export function AdminDashboard() {
     },
   });
   const updateChannelMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof updateNotificationChannel>[1] }) => updateNotificationChannel(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof updateNotificationChannel>[1] }) =>
+      updateNotificationChannel(id, data),
     onSuccess: (data) => {
       queryClient.setQueryData(['admin-channels'], (old: { notification_channels: NotificationChannel[] } | undefined) => ({
         notification_channels: (old?.notification_channels ?? []).map((ch) =>
@@ -240,7 +297,8 @@ export function AdminDashboard() {
     },
   });
   const updateMaintenanceMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof updateMaintenanceWindow>[1] }) => updateMaintenanceWindow(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Parameters<typeof updateMaintenanceWindow>[1] }) =>
+      updateMaintenanceWindow(id, data),
     onSuccess: (data) => {
       queryClient.setQueryData(['admin-maintenance-windows'], (old: { maintenance_windows: MaintenanceWindow[] } | undefined) => ({
         maintenance_windows: (old?.maintenance_windows ?? []).map((w) =>
@@ -259,7 +317,10 @@ export function AdminDashboard() {
     },
   });
 
-  const monitorNameById = new Map((monitorsQuery.data?.monitors ?? []).map((m) => [m.id, m.name] as const));
+  const monitorNameById = useMemo(
+    () => new Map((monitorsQuery.data?.monitors ?? []).map((m) => [m.id, m.name] as const)),
+    [monitorsQuery.data?.monitors],
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -268,16 +329,46 @@ export function AdminDashboard() {
           <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">Admin Dashboard</h1>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <Link to="/admin/analytics" className="flex items-center justify-center h-9 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors px-3 rounded-lg">
-              <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+            <Link
+              to="/admin/analytics"
+              className="flex items-center justify-center h-9 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors px-3 rounded-lg"
+            >
+              <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
+              </svg>
               <span className="hidden sm:inline">Analytics</span>
             </Link>
-            <Link to="/" className="flex items-center justify-center h-9 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors px-3 rounded-lg">
-              <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <Link
+              to="/"
+              className="flex items-center justify-center h-9 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors px-3 rounded-lg"
+            >
+              <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
               <span className="hidden sm:inline">Status</span>
             </Link>
-            <button onClick={logout} className="flex items-center justify-center h-9 text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors px-3 rounded-lg">
-              <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            <button
+              onClick={logout}
+              className="flex items-center justify-center h-9 text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors px-3 rounded-lg"
+            >
+              <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
               <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
@@ -292,8 +383,10 @@ export function AdminDashboard() {
               onClick={() => setTab(t.key)}
               className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${tab === t.key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
             >
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={t.icon} /></svg>
-              <span className="hidden xs:inline sm:inline">{t.label}</span>
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={t.icon} />
+              </svg>
+              {t.label}
             </button>
           ))}
         </div>
@@ -304,15 +397,10 @@ export function AdminDashboard() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Monitors</h2>
-              <Button onClick={() => { createMonitorMut.reset(); updateMonitorMut.reset(); setModal({ type: 'create-monitor' }); }}>Add Monitor</Button>
+              <Button onClick={() => setModal({ type: 'create-monitor' })}>Add Monitor</Button>
             </div>
             {monitorsQuery.isLoading ? (
               <div className="text-slate-500 dark:text-slate-400">Loading...</div>
-            ) : monitorsQuery.isError ? (
-              <Card className="p-8 text-center">
-                <div className="text-red-600 dark:text-red-400 font-medium mb-2">Failed to load monitors</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">{formatError(monitorsQuery.error) ?? 'Unknown error'}</div>
-              </Card>
             ) : !monitorsQuery.data?.monitors.length ? (
               <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">No monitors yet</Card>
             ) : (
@@ -332,14 +420,41 @@ export function AdminDashboard() {
                       {monitorsQuery.data.monitors.map((m) => (
                         <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                           <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{m.name}</td>
-                          <td className="px-3 sm:px-4 py-3"><Badge variant="info">{m.type}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3">
+                            <Badge variant="info">{m.type}</Badge>
+                          </td>
                           <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{m.target}</td>
-                          <td className="px-3 sm:px-4 py-3"><Badge variant={m.is_active ? 'up' : 'unknown'}>{m.is_active ? 'Active' : 'Paused'}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3">
+                            <Badge variant={m.is_active ? 'up' : 'unknown'}>{m.is_active ? 'Active' : 'Paused'}</Badge>
+                          </td>
                           <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1 sm:gap-0">
-                              <button onClick={() => { setTestingMonitorId(m.id); testMonitorMut.mutate(m.id); }} disabled={testingMonitorId === m.id} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">{testingMonitorId === m.id ? 'Testing...' : 'Test'}</button>
-                              <button onClick={() => { createMonitorMut.reset(); updateMonitorMut.reset(); setModal({ type: 'edit-monitor', monitor: m }); }} className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Edit</button>
-                              <button onClick={() => confirm('Delete?') && deleteMonitorMut.mutate(m.id)} className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Delete</button>
+                              <button
+                                onClick={() => {
+                                  setTestingMonitorId(m.id);
+                                  testMonitorMut.mutate(m.id);
+                                }}
+                                disabled={testingMonitorId === m.id}
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                {testingMonitorId === m.id ? 'Testing...' : 'Test'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  createMonitorMut.reset();
+                                  updateMonitorMut.reset();
+                                  setModal({ type: 'edit-monitor', monitor: m });
+                                }}
+                                className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => confirm('Delete?') && deleteMonitorMut.mutate(m.id)}
+                                className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -378,13 +493,34 @@ export function AdminDashboard() {
                       {channelsQuery.data.notification_channels.map((ch) => (
                         <tr key={ch.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                           <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{ch.name}</td>
-                          <td className="px-3 sm:px-4 py-3"><Badge variant="info">{ch.type}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3">
+                            <Badge variant="info">{ch.type}</Badge>
+                          </td>
                           <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{ch.config_json.url}</td>
                           <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1 sm:gap-0">
-                              <button onClick={() => { setTestingChannelId(ch.id); testChannelMut.mutate(ch.id); }} disabled={testingChannelId === ch.id} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">{testingChannelId === ch.id ? 'Testing...' : 'Test'}</button>
-                              <button onClick={() => setModal({ type: 'edit-channel', channel: ch })} className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Edit</button>
-                              <button onClick={() => confirm(`Delete "${ch.name}"?`) && deleteChannelMut.mutate(ch.id)} className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Delete</button>
+                              <button
+                                onClick={() => {
+                                  setTestingChannelId(ch.id);
+                                  testChannelMut.mutate(ch.id);
+                                }}
+                                disabled={testingChannelId === ch.id}
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                {testingChannelId === ch.id ? 'Testing...' : 'Test'}
+                              </button>
+                              <button
+                                onClick={() => setModal({ type: 'edit-channel', channel: ch })}
+                                className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => confirm(`Delete "${ch.name}"?`) && deleteChannelMut.mutate(ch.id)}
+                                className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -413,14 +549,14 @@ export function AdminDashboard() {
                 </div>
 
                 <select
-                  value={uptimeRatingQuery.data?.uptime_rating_level ?? 3}
+                  value={settings?.uptime_rating_level ?? 3}
                   onChange={(e) => {
                     const next = Number(e.target.value) as 1 | 2 | 3 | 4 | 5;
-                    const cur = uptimeRatingQuery.data?.uptime_rating_level ?? 3;
+                    const cur = settings?.uptime_rating_level ?? 3;
                     if (next === cur) return;
-                    updateUptimeRatingMut.mutate(next);
+                    patchSettingsMut.mutate({ uptime_rating_level: next });
                   }}
-                  disabled={uptimeRatingQuery.isLoading || updateUptimeRatingMut.isPending}
+                  disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
                   className="border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                 >
                   <option value={1}>Level 1 - Personal / Hobby</option>
@@ -431,15 +567,197 @@ export function AdminDashboard() {
                 </select>
               </div>
 
-              {uptimeRatingQuery.isError && (
-                <div className="mt-3 text-sm text-red-600 dark:text-red-400">Failed to load uptime rating</div>
+              {settingsQuery.isError && (
+                <div className="mt-3 text-sm text-red-600 dark:text-red-400">Failed to load settings</div>
               )}
 
-              {updateUptimeRatingMut.isError && (
+              {patchSettingsMut.isError && (
                 <div className="mt-3 text-sm text-red-600 dark:text-red-400">
-                  {formatError(updateUptimeRatingMut.error) ?? 'Failed to update uptime rating'}
+                  {formatError(patchSettingsMut.error) ?? 'Failed to update settings'}
                 </div>
               )}
+            </Card>
+
+            <Card className="p-4 sm:p-5">
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Site Branding</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Controls the status page title and description.
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Site Title
+                    </label>
+                    <input
+                      value={settings?.site_title ?? ''}
+                      onChange={(e) => {
+                        const next = sanitizeSiteTitle(e.target.value);
+                        patchSettingsMut.mutate({ site_title: next });
+                      }}
+                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Timezone
+                    </label>
+                    <input
+                      value={settings?.site_timezone ?? ''}
+                      onChange={(e) => {
+                        const next = e.target.value.trim().slice(0, 64) || 'UTC';
+                        patchSettingsMut.mutate({ site_timezone: next });
+                      }}
+                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      placeholder="UTC"
+                      className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                    />
+                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">IANA name (e.g. UTC, Asia/Shanghai)</div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Site Description
+                  </label>
+                  <textarea
+                    value={settings?.site_description ?? ''}
+                    onChange={(e) => {
+                      const next = sanitizeSiteDescription(e.target.value);
+                      patchSettingsMut.mutate({ site_description: next });
+                    }}
+                    disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                    rows={3}
+                    className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Retention</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    How many days of raw check results to keep.
+                  </div>
+                </div>
+
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={settings?.retention_check_results_days ?? 7}
+                  onChange={(e) => {
+                    const next = clampInt(Number(e.target.value), 1, 365);
+                    patchSettingsMut.mutate({ retention_check_results_days: next });
+                  }}
+                  disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                  className="w-40 border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                />
+              </div>
+            </Card>
+
+            <Card className="p-4 sm:p-5">
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">State Machine Defaults</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Global thresholds for UP/DOWN transitions.
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Failures to mark DOWN
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={settings?.state_failures_to_down_from_up ?? 2}
+                      onChange={(e) => {
+                        const next = clampInt(Number(e.target.value), 1, 10);
+                        patchSettingsMut.mutate({ state_failures_to_down_from_up: next });
+                      }}
+                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Successes to mark UP
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={settings?.state_successes_to_up_from_down ?? 2}
+                      onChange={(e) => {
+                        const next = clampInt(Number(e.target.value), 1, 10);
+                        patchSettingsMut.mutate({ state_successes_to_up_from_down: next });
+                      }}
+                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 sm:p-5">
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Admin Defaults</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Default ranges used in Analytics.
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Overview Range
+                    </label>
+                    <select
+                      value={settings?.admin_default_overview_range ?? '24h'}
+                      onChange={(e) => {
+                        patchSettingsMut.mutate({ admin_default_overview_range: e.target.value as '24h' | '7d' });
+                      }}
+                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                    >
+                      <option value="24h">24h</option>
+                      <option value="7d">7d</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Monitor Range
+                    </label>
+                    <select
+                      value={settings?.admin_default_monitor_range ?? '24h'}
+                      onChange={(e) => {
+                        patchSettingsMut.mutate({ admin_default_monitor_range: e.target.value as AdminSettings['admin_default_monitor_range'] });
+                      }}
+                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                    >
+                      <option value="24h">24h</option>
+                      <option value="7d">7d</option>
+                      <option value="30d">30d</option>
+                      <option value="90d">90d</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </Card>
           </div>
         )}
@@ -457,7 +775,7 @@ export function AdminDashboard() {
             ) : (
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px]">
+                  <table className="w-full min-w-[650px]">
                     <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
                       <tr>
                         <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Title</th>
@@ -471,14 +789,39 @@ export function AdminDashboard() {
                       {incidentsQuery.data.incidents.map((it) => (
                         <tr key={it.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                           <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{it.title}</td>
-                          <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 dark:text-slate-400 truncate max-w-[150px]">{it.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}</td>
-                          <td className="px-3 sm:px-4 py-3"><Badge variant={it.status === 'resolved' ? 'up' : 'paused'}>{it.status}</Badge></td>
-                          <td className="px-3 sm:px-4 py-3"><Badge variant={it.impact === 'critical' ? 'down' : it.impact === 'major' ? 'down' : 'paused'}>{it.impact}</Badge></td>
+                          <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
+                            {it.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}
+                          </td>
+                          <td className="px-3 sm:px-4 py-3">
+                            <Badge variant={it.status === 'resolved' ? 'up' : 'paused'}>{it.status}</Badge>
+                          </td>
+                          <td className="px-3 sm:px-4 py-3">
+                            <Badge variant={it.impact === 'critical' ? 'down' : it.impact === 'major' ? 'down' : 'paused'}>
+                              {it.impact}
+                            </Badge>
+                          </td>
                           <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1 sm:gap-0">
-                              <button onClick={() => setModal({ type: 'add-incident-update', incident: it })} disabled={it.status === 'resolved'} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Update</button>
-                              <button onClick={() => setModal({ type: 'resolve-incident', incident: it })} disabled={it.status === 'resolved'} className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Resolve</button>
-                              <button onClick={() => confirm(`Delete "${it.title}"?`) && deleteIncidentMut.mutate(it.id)} className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Delete</button>
+                              <button
+                                onClick={() => setModal({ type: 'add-incident-update', incident: it })}
+                                disabled={it.status === 'resolved'}
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                Update
+                              </button>
+                              <button
+                                onClick={() => setModal({ type: 'resolve-incident', incident: it })}
+                                disabled={it.status === 'resolved'}
+                                className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                Resolve
+                              </button>
+                              <button
+                                onClick={() => confirm(`Delete "${it.title}"?`) && deleteIncidentMut.mutate(it.id)}
+                                className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                              >
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -522,12 +865,26 @@ export function AdminDashboard() {
                           <tr key={w.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                             <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{w.title}</td>
                             <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 dark:text-slate-400 truncate max-w-[120px]">{w.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}</td>
-                            <td className="px-3 sm:px-4 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{new Date(w.starts_at * 1000).toLocaleString()} – {new Date(w.ends_at * 1000).toLocaleString()}</td>
-                            <td className="px-3 sm:px-4 py-3"><Badge variant={state === 'Active' ? 'maintenance' : state === 'Upcoming' ? 'paused' : 'unknown'}>{state}</Badge></td>
+                            <td className="px-3 sm:px-4 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(w.starts_at, settings?.site_timezone)} – {formatDateTime(w.ends_at, settings?.site_timezone)}</td>
+                            <td className="px-3 sm:px-4 py-3">
+                              <Badge variant={state === 'Active' ? 'maintenance' : state === 'Upcoming' ? 'paused' : 'unknown'}>
+                                {state}
+                              </Badge>
+                            </td>
                             <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1 sm:gap-0">
-                                <button onClick={() => setModal({ type: 'edit-maintenance', window: w })} className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Edit</button>
-                                <button onClick={() => confirm(`Delete "${w.title}"?`) && deleteMaintenanceMut.mutate(w.id)} className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors">Delete</button>
+                                <button
+                                  onClick={() => setModal({ type: 'edit-maintenance', window: w })}
+                                  className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => confirm(`Delete "${w.title}"?`) && deleteMaintenanceMut.mutate(w.id)}
+                                  className="text-sm text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 sm:px-2.5 py-1.5 rounded-md transition-colors"
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -567,7 +924,11 @@ export function AdminDashboard() {
                 }
                 onCancel={closeModal}
                 isLoading={createMonitorMut.isPending || updateMonitorMut.isPending}
-                error={modal.type === 'create-monitor' ? formatError(createMonitorMut.error) : formatError(updateMonitorMut.error)}
+                error={
+                  modal.type === 'create-monitor'
+                    ? formatError(createMonitorMut.error)
+                    : formatError(updateMonitorMut.error)
+                }
               />
             )}
             {(modal.type === 'create-channel' || modal.type === 'edit-channel') && (
@@ -588,19 +949,43 @@ export function AdminDashboard() {
               />
             )}
             {modal.type === 'create-incident' && (
-              <IncidentForm monitors={(monitorsQuery.data?.monitors ?? []).map((m) => ({ id: m.id, name: m.name }))} onSubmit={(data) => createIncidentMut.mutate(data)} onCancel={closeModal} isLoading={createIncidentMut.isPending} />
+              <IncidentForm
+                monitors={(monitorsQuery.data?.monitors ?? []).map((m) => ({ id: m.id, name: m.name }))}
+                onSubmit={(data) => createIncidentMut.mutate(data)}
+                onCancel={closeModal}
+                isLoading={createIncidentMut.isPending}
+              />
             )}
             {modal.type === 'add-incident-update' && (
-              <IncidentUpdateForm onSubmit={(data) => addIncidentUpdateMut.mutate({ id: modal.incident.id, data })} onCancel={closeModal} isLoading={addIncidentUpdateMut.isPending} />
+              <IncidentUpdateForm
+                onSubmit={(data) => addIncidentUpdateMut.mutate({ id: modal.incident.id, data })}
+                onCancel={closeModal}
+                isLoading={addIncidentUpdateMut.isPending}
+              />
             )}
             {modal.type === 'resolve-incident' && (
-              <ResolveIncidentForm onSubmit={(data) => resolveIncidentMut.mutate({ id: modal.incident.id, data })} onCancel={closeModal} isLoading={resolveIncidentMut.isPending} />
+              <ResolveIncidentForm
+                onSubmit={(data) => resolveIncidentMut.mutate({ id: modal.incident.id, data })}
+                onCancel={closeModal}
+                isLoading={resolveIncidentMut.isPending}
+              />
             )}
             {modal.type === 'create-maintenance' && (
-              <MaintenanceWindowForm monitors={(monitorsQuery.data?.monitors ?? []).map((m) => ({ id: m.id, name: m.name }))} onSubmit={(data) => createMaintenanceMut.mutate(data)} onCancel={closeModal} isLoading={createMaintenanceMut.isPending} />
+              <MaintenanceWindowForm
+                monitors={(monitorsQuery.data?.monitors ?? []).map((m) => ({ id: m.id, name: m.name }))}
+                onSubmit={(data) => createMaintenanceMut.mutate(data)}
+                onCancel={closeModal}
+                isLoading={createMaintenanceMut.isPending}
+              />
             )}
             {modal.type === 'edit-maintenance' && (
-              <MaintenanceWindowForm monitors={(monitorsQuery.data?.monitors ?? []).map((m) => ({ id: m.id, name: m.name }))} window={modal.window} onSubmit={(data) => updateMaintenanceMut.mutate({ id: modal.window.id, data })} onCancel={closeModal} isLoading={updateMaintenanceMut.isPending} />
+              <MaintenanceWindowForm
+                monitors={(monitorsQuery.data?.monitors ?? []).map((m) => ({ id: m.id, name: m.name }))}
+                window={modal.window}
+                onSubmit={(data) => updateMaintenanceMut.mutate({ id: modal.window.id, data })}
+                onCancel={closeModal}
+                isLoading={updateMaintenanceMut.isPending}
+              />
             )}
           </div>
         </div>

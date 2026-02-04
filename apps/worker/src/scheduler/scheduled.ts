@@ -16,6 +16,7 @@ import { runTcpCheck } from '../monitor/tcp';
 import type { CheckOutcome } from '../monitor/types';
 import { dispatchWebhookToChannels, type WebhookChannel } from '../notify/webhook';
 import { computePublicStatusPayload } from '../public/status';
+import { readSettings } from '../settings';
 import { refreshPublicStatusSnapshot } from '../snapshots';
 import { acquireLease } from './lock';
 
@@ -394,6 +395,7 @@ async function runDueMonitor(
   checkedAt: number,
   notify: NotifyContext | null,
   maintenanceSuppressed: boolean,
+  stateMachineConfig: { failuresToDownFromUp: number; successesToUpFromDown: number },
 ): Promise<void> {
   const prevStatus = toMonitorStatus(row.state_status);
   const prev: MonitorStateSnapshot | null =
@@ -459,7 +461,7 @@ async function runDueMonitor(
     };
   }
 
-  const { next, outageAction } = computeNextState(prev, outcome, checkedAt);
+  const { next, outageAction } = computeNextState(prev, outcome, checkedAt, stateMachineConfig);
   const stateLastError = computeStateLastError(next.status, outcome, row.state_last_error);
 
   await persistCheckAndState(
@@ -542,6 +544,13 @@ export async function runScheduledTick(env: Env, ctx: ExecutionContext): Promise
   const channels = await listActiveWebhookChannels(env.DB);
   const notify: NotifyContext | null =
     channels.length === 0 ? null : { ctx, envRecord: env as unknown as Record<string, unknown>, channels };
+
+  // Load global settings once per tick.
+  const settings = await readSettings(env.DB);
+  const stateMachineConfig = {
+    failuresToDownFromUp: settings.state_failures_to_down_from_up,
+    successesToUpFromDown: settings.state_successes_to_up_from_down,
+  };
 
   // Emit maintenance start/end notifications. This is best-effort and uses the existing
   // notification_deliveries idempotency key to avoid duplicates.
@@ -634,7 +643,9 @@ export async function runScheduledTick(env: Env, ctx: ExecutionContext): Promise
 
   const limit = pLimit(CHECK_CONCURRENCY);
   const settled = await Promise.allSettled(
-    due.map((m) => limit(() => runDueMonitor(env, m, checkedAt, notify, suppressedMonitorIds.has(m.id)))),
+    due.map((m) =>
+      limit(() => runDueMonitor(env, m, checkedAt, notify, suppressedMonitorIds.has(m.id), stateMachineConfig)),
+    ),
   );
 
   const rejected = settled.filter((r) => r.status === 'rejected');

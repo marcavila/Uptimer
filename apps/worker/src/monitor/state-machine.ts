@@ -19,19 +19,43 @@ export type NextState = {
   changed: boolean;
 };
 
-const FAILURES_TO_DOWN_FROM_UP = 2;
-const SUCCESSES_TO_UP_FROM_DOWN = 2;
+export type StateMachineConfig = {
+  failuresToDownFromUp: number;
+  successesToUpFromDown: number;
+};
+
+const DEFAULT_CONFIG: StateMachineConfig = {
+  failuresToDownFromUp: 2,
+  successesToUpFromDown: 2,
+};
+
 const MAX_STREAK = 1000;
 
 function capStreak(n: number): number {
   return Math.min(Math.max(n, 0), MAX_STREAK);
 }
 
+function normalizeThreshold(raw: number | undefined, fallback: number): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return fallback;
+  const n = Math.trunc(raw);
+  return n >= 1 ? n : fallback;
+}
+
+function normalizeConfig(config?: Partial<StateMachineConfig>): StateMachineConfig {
+  return {
+    failuresToDownFromUp: normalizeThreshold(config?.failuresToDownFromUp, DEFAULT_CONFIG.failuresToDownFromUp),
+    successesToUpFromDown: normalizeThreshold(config?.successesToUpFromDown, DEFAULT_CONFIG.successesToUpFromDown),
+  };
+}
+
 export function computeNextState(
   prev: MonitorStateSnapshot | null,
   outcome: CheckOutcome,
-  checkedAt: number
+  checkedAt: number,
+  config?: Partial<StateMachineConfig>,
 ): { next: NextState; outageAction: OutageAction } {
+  const cfg = normalizeConfig(config);
+
   const prevStatus: MonitorStatus = prev?.status ?? 'unknown';
 
   // For operator-enforced states, do not auto-transition.
@@ -62,7 +86,7 @@ export function computeNextState(
     successes = capStreak(prevSuccesses + 1);
 
     if (prevStatus === 'down') {
-      if (successes >= SUCCESSES_TO_UP_FROM_DOWN) {
+      if (successes >= cfg.successesToUpFromDown) {
         nextStatus = 'up';
         changed = true;
       } else {
@@ -79,7 +103,7 @@ export function computeNextState(
     failures = capStreak(prevFailures + 1);
 
     if (prevStatus === 'up') {
-      if (failures >= FAILURES_TO_DOWN_FROM_UP) {
+      if (failures >= cfg.failuresToDownFromUp) {
         nextStatus = 'down';
         changed = true;
       } else {
@@ -120,4 +144,3 @@ export function computeNextState(
     outageAction,
   };
 }
-

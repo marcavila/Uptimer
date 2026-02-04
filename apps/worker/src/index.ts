@@ -5,6 +5,7 @@ import { handleError, handleNotFound } from './middleware/errors';
 import { adminRoutes } from './routes/admin';
 import { publicRoutes } from './routes/public';
 import { runDailyRollup } from './scheduler/daily-rollup';
+import { runRetention } from './scheduler/retention';
 import { runScheduledTick } from './scheduler/scheduled';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -55,6 +56,7 @@ export default {
   fetch: app.fetch,
   scheduled: async (controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
     if (controller.cron === '0 0 * * *') {
+      await runRetention(env, controller);
       await runDailyRollup(env, controller, ctx);
       return;
     }

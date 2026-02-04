@@ -67,6 +67,7 @@ function statusBadgeClass(status) {
 
 function renderPreload(snapshot) {
   const overall = typeof snapshot.overall_status === 'string' ? snapshot.overall_status : 'unknown';
+  const siteTitle = typeof snapshot.site_title === 'string' ? snapshot.site_title : 'Uptimer';
   const bannerTitle =
     snapshot && snapshot.banner && typeof snapshot.banner.title === 'string'
       ? snapshot.banner.title
@@ -116,7 +117,7 @@ function renderPreload(snapshot) {
     <div class="min-h-screen bg-slate-50 dark:bg-slate-900">
       <header class="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
         <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div class="text-lg font-bold text-slate-900 dark:text-slate-100">Uptimer</div>
+          <div class="text-lg font-bold text-slate-900 dark:text-slate-100">${escapeHtml(siteTitle)}</div>
           <span class="inline-flex items-center rounded-full font-medium ring-1 ring-inset px-2.5 py-1 text-sm ${statusBadgeClass(
             overall,
           )}">${escapeHtml(overall)}</span>

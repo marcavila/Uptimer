@@ -81,6 +81,9 @@ export interface PublicMonitor {
 
 export interface StatusResponse {
   generated_at: number;
+  site_title: string;
+  site_description: string;
+  site_timezone: string;
   uptime_rating_level: 1 | 2 | 3 | 4 | 5;
   overall_status: MonitorStatus;
   banner: {
@@ -393,4 +396,26 @@ export interface ApiError {
     code: string;
     message: string;
   };
+}
+
+
+// Admin settings (non-sensitive, stored in D1 settings table)
+export interface AdminSettings {
+  site_title: string;
+  site_description: string;
+  site_timezone: string;
+
+  retention_check_results_days: number;
+
+  state_failures_to_down_from_up: number;
+  state_successes_to_up_from_down: number;
+
+  admin_default_overview_range: '24h' | '7d';
+  admin_default_monitor_range: '24h' | '7d' | '30d' | '90d';
+
+  uptime_rating_level: UptimeRatingLevel;
+}
+
+export interface AdminSettingsResponse {
+  settings: AdminSettings;
 }

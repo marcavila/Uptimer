@@ -1,5 +1,7 @@
 import type { PublicStatusResponse } from '../schemas/public-status';
 
+import { readSettings } from '../settings';
+
 type PublicStatusMonitorRow = {
   id: number;
   name: string;
@@ -666,8 +668,13 @@ export async function computePublicStatusPayload(db: D1Database, now: number): P
     return { source: 'monitors', status: 'operational', title: 'All Systems Operational' };
   })();
 
+  const settings = await readSettings(db);
+
   return {
     generated_at: now,
+    site_title: settings.site_title,
+    site_description: settings.site_description,
+    site_timezone: settings.site_timezone,
     // Uptime color thresholds are configurable (1-5). Default: Level 3 (Production/SaaS).
     uptime_rating_level: uptimeRatingLevel,
     overall_status,

@@ -110,6 +110,9 @@ const bannerSchema = z.discriminatedUnion('source', [
 
 export const publicStatusResponseSchema = z.object({
   generated_at: z.number().int().nonnegative(),
+  site_title: z.string().default('Uptimer'),
+  site_description: z.string().default(''),
+  site_timezone: z.string().default('UTC'),
   uptime_rating_level: uptimeRatingLevelSchema,
   overall_status: monitorStatusSchema,
   banner: bannerSchema,

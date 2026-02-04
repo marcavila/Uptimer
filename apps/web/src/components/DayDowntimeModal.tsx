@@ -2,14 +2,15 @@ import { useMemo } from 'react';
 
 import type { Outage } from '../api/types';
 import { Button } from './ui';
+import { formatDate, formatTime } from '../utils/datetime';
 import { computeDayDowntimeIntervals, computeIntervalTotalSeconds } from './UptimeBar30d';
 
-function formatDay(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString();
+function formatDay(ts: number, timeZone?: string): string {
+  return formatDate(ts, timeZone);
 }
 
-function formatTime(ts: number): string {
-  return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function formatClock(ts: number, timeZone?: string): string {
+  return timeZone ? formatTime(ts, { timeZone, hour12: false }) : formatTime(ts, { hour12: false });
 }
 
 function formatSec(totalSeconds: number): string {
@@ -27,10 +28,12 @@ export function DayDowntimeModal({
   dayStartAt,
   outages,
   onClose,
+  timeZone,
 }: {
   dayStartAt: number;
   outages: Outage[];
   onClose: () => void;
+  timeZone?: string;
 }) {
   const intervals = useMemo(
     () => computeDayDowntimeIntervals(dayStartAt, outages),
@@ -54,7 +57,7 @@ export function DayDowntimeModal({
               Downtime
             </div>
             <h2 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100">
-              {formatDay(dayStartAt)}
+              {formatDay(dayStartAt, timeZone)}
             </h2>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               Total: {formatSec(totalDowntimeSec)}
@@ -75,7 +78,7 @@ export function DayDowntimeModal({
                 className="flex items-center justify-between gap-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50"
               >
                 <div className="text-sm text-slate-700 dark:text-slate-200">
-                  {formatTime(it.start)} – {formatTime(it.end)}
+                  {formatClock(it.start, timeZone)} – {formatClock(it.end, timeZone)}
                 </div>
                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100 tabular-nums">
                   {formatSec(it.end - it.start)}

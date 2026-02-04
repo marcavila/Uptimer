@@ -1,5 +1,7 @@
 import type {
   AdminMonitor,
+  AdminSettings,
+  AdminSettingsResponse,
   AdminIncidentsResponse,
   AnalyticsOverviewResponse,
   AnalyticsOverviewRange,
@@ -235,24 +237,6 @@ export async function fetchPublicMonitorOutages(
 
 export { ApiError };
 
-export async function fetchAdminUptimeRating(): Promise<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }> {
-  const res = await fetch(`${API_BASE}/admin/settings/uptime-rating`, {
-    headers: getAuthHeaders(),
-  });
-  return handleResponse<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }>(res);
-}
-
-export async function updateAdminUptimeRating(
-  uptime_rating_level: 1 | 2 | 3 | 4 | 5,
-): Promise<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }> {
-  const res = await fetch(`${API_BASE}/admin/settings/uptime-rating`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    body: JSON.stringify({ uptime_rating_level }),
-  });
-  return handleResponse<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }>(res);
-}
-
 // Admin API - Monitors
 export async function fetchAdminMonitors(limit = 50): Promise<{ monitors: AdminMonitor[] }> {
   const res = await fetch(`${API_BASE}/admin/monitors?limit=${limit}`, {
@@ -476,4 +460,40 @@ export async function fetchAdminMonitorOutages(
     headers: getAuthHeaders(),
   });
   return handleResponse<MonitorOutagesResponse>(res);
+}
+
+export async function fetchAdminSettings(): Promise<AdminSettingsResponse> {
+  const res = await fetch(`${API_BASE}/admin/settings`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<AdminSettingsResponse>(res);
+}
+
+export async function patchAdminSettings(
+  input: Partial<AdminSettings>,
+): Promise<AdminSettingsResponse> {
+  const res = await fetch(`${API_BASE}/admin/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<AdminSettingsResponse>(res);
+}
+
+export async function fetchAdminUptimeRating(): Promise<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }> {
+  const res = await fetch(`${API_BASE}/admin/settings/uptime-rating`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }>(res);
+}
+
+export async function updateAdminUptimeRating(
+  uptime_rating_level: 1 | 2 | 3 | 4 | 5,
+): Promise<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }> {
+  const res = await fetch(`${API_BASE}/admin/settings/uptime-rating`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ uptime_rating_level }),
+  });
+  return handleResponse<{ uptime_rating_level: 1 | 2 | 3 | 4 | 5 }>(res);
 }

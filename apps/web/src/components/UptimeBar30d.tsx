@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import type { UptimeDay, UptimeRatingLevel } from '../api/types';
+import { formatDate } from '../utils/datetime';
 
 type DowntimeInterval = { start: number; end: number };
 
@@ -8,11 +9,12 @@ interface UptimeBar30dProps {
   days: UptimeDay[];
   ratingLevel?: UptimeRatingLevel;
   maxBars?: number;
+  timeZone: string;
   onDayClick?: (dayStartAt: number) => void;
 }
 
-function formatDay(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString();
+function formatDay(ts: number, timeZone: string): string {
+  return formatDate(ts, timeZone);
 }
 
 function formatSec(totalSeconds: number): string {
@@ -108,7 +110,7 @@ interface TooltipState {
   position: { x: number; y: number };
 }
 
-function Tooltip({ day, position, ratingLevel }: { day: UptimeDay; position: { x: number; y: number }; ratingLevel: UptimeRatingLevel }) {
+function Tooltip({ day, position, ratingLevel, timeZone }: { day: UptimeDay; position: { x: number; y: number }; ratingLevel: UptimeRatingLevel; timeZone: string }) {
   return (
     <div
       className="fixed z-50 px-3 py-2 text-xs bg-slate-900 dark:bg-slate-700 text-white rounded-lg shadow-lg pointer-events-none animate-fade-in"
@@ -118,7 +120,7 @@ function Tooltip({ day, position, ratingLevel }: { day: UptimeDay; position: { x
         transform: 'translateX(-50%)',
       }}
     >
-      <div className="font-medium mb-1">{formatDay(day.day_start_at)}</div>
+      <div className="font-medium mb-1">{formatDay(day.day_start_at, timeZone)}</div>
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${getUptimeColorClasses(day.uptime_pct, ratingLevel)}`} />
         <span>
@@ -132,7 +134,7 @@ function Tooltip({ day, position, ratingLevel }: { day: UptimeDay; position: { x
   );
 }
 
-export function UptimeBar30d({ days, ratingLevel = 3, maxBars = 30, onDayClick }: UptimeBar30dProps) {
+export function UptimeBar30d({ days, ratingLevel = 3, maxBars = 30, timeZone, onDayClick }: UptimeBar30dProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const displayDays = useMemo(() => {
@@ -170,7 +172,7 @@ export function UptimeBar30d({ days, ratingLevel = 3, maxBars = 30, onDayClick }
             <button
               key={d.day_start_at}
               type="button"
-              aria-label={`Uptime ${formatDay(d.day_start_at)}`}
+              aria-label={`Uptime ${formatDay(d.day_start_at, timeZone)}`}
               className={`flex-1 min-w-[3px] sm:min-w-[4px] max-w-[6px] sm:max-w-[8px] rounded-sm transition-all duration-150
                 ${getUptimeColorClasses(pct, ratingLevel)}
                 hover:scale-y-110 hover:shadow-md ${tooltip?.day.day_start_at === d.day_start_at ? getUptimeGlow(pct, ratingLevel) : ''}`}
@@ -186,7 +188,14 @@ export function UptimeBar30d({ days, ratingLevel = 3, maxBars = 30, onDayClick }
         })}
       </div>
 
-      {tooltip && <Tooltip day={tooltip.day} position={tooltip.position} ratingLevel={ratingLevel} />}
+      {tooltip && (
+        <Tooltip
+          day={tooltip.day}
+          position={tooltip.position}
+          ratingLevel={ratingLevel}
+          timeZone={timeZone}
+        />
+      )}
     </>
   );
 }

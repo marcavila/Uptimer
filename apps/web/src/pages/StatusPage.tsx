@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Suspense, lazy, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { fetchLatency, fetchPublicMonitorOutages, fetchStatus } from '../api/client';
@@ -7,6 +7,7 @@ import type { Incident, MonitorStatus, Outage, PublicMonitor, StatusResponse } f
 import { DayDowntimeModal } from '../components/DayDowntimeModal';
 import { Markdown } from '../components/Markdown';
 import { UptimeBar30d } from '../components/UptimeBar30d';
+import { formatDateTime, formatTime } from '../utils/datetime';
 import { Badge, Card, StatusDot, ThemeToggle } from '../components/ui';
 
 type BannerStatus = StatusResponse['banner']['status'];
@@ -81,7 +82,7 @@ function getUptimeTextColorClasses(uptimePct: number, level: 1 | 2 | 3 | 4 | 5):
   return 'text-rose-700 dark:text-rose-400';
 }
 
-function MonitorCard({ monitor, onSelect, onDayClick }: { monitor: PublicMonitor; onSelect: () => void; onDayClick: (dayStartAt: number) => void }) {
+function MonitorCard({ monitor, onSelect, onDayClick, timeZone }: { monitor: PublicMonitor; onSelect: () => void; onDayClick: (dayStartAt: number) => void; timeZone: string }) {
   const uptime30d = monitor.uptime_30d;
 
   return (
@@ -105,6 +106,7 @@ function MonitorCard({ monitor, onSelect, onDayClick }: { monitor: PublicMonitor
         days={monitor.uptime_days}
         ratingLevel={monitor.uptime_rating_level}
         maxBars={30}
+        timeZone={timeZone}
         onDayClick={onDayClick}
       />
 
@@ -122,11 +124,7 @@ function MonitorCard({ monitor, onSelect, onDayClick }: { monitor: PublicMonitor
             <span className="text-slate-500 dark:text-slate-400">{monitor.last_latency_ms}ms</span>
           )}
         </div>
-        <span className="text-slate-400 dark:text-slate-500 text-xs">
-          {monitor.last_checked_at
-            ? new Date(monitor.last_checked_at * 1000).toLocaleTimeString()
-            : 'Never checked'}
-        </span>
+        <span className="text-slate-400 dark:text-slate-500 text-xs">{monitor.last_checked_at ? (timeZone ? formatTime(monitor.last_checked_at, { timeZone }) : formatTime(monitor.last_checked_at)) : 'Never checked'}</span>
       </div>
     </Card>
   );
@@ -210,7 +208,7 @@ function MonitorDetail({ monitorId, onClose }: { monitorId: number; onClose: () 
   );
 }
 
-function IncidentCard({ incident, onClick }: { incident: Incident; onClick: () => void }) {
+function IncidentCard({ incident, onClick, timeZone }: { incident: Incident; onClick: () => void; timeZone: string }) {
   return (
     <button
       onClick={onClick}
@@ -232,7 +230,7 @@ function IncidentCard({ incident, onClick }: { incident: Incident; onClick: () =
       </div>
       <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 mb-3">
         <Badge variant="info">{incident.status}</Badge>
-        <span>{new Date(incident.started_at * 1000).toLocaleString()}</span>
+        <span>{formatDateTime(incident.started_at, timeZone)}</span>
       </div>
       {incident.message && (
         <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">{incident.message}</p>
@@ -245,10 +243,12 @@ function IncidentDetail({
   incident,
   monitorNames,
   onClose,
+  timeZone,
 }: {
   incident: Incident;
   monitorNames: Map<number, string>;
   onClose: () => void;
+  timeZone: string;
 }) {
   return (
     <div
@@ -303,14 +303,14 @@ function IncidentDetail({
             <span className="text-slate-400 dark:text-slate-500 sm:w-20 text-xs sm:text-sm">
               Started:
             </span>
-            <span className="text-sm">{new Date(incident.started_at * 1000).toLocaleString()}</span>
+            <span className="text-sm">{formatDateTime(incident.started_at, timeZone)}</span>
           </div>
           {incident.resolved_at && (
             <div className="flex flex-col sm:flex-row sm:gap-2">
               <span className="text-slate-400 dark:text-slate-500 sm:w-20 text-xs sm:text-sm">
                 Resolved:
               </span>
-              <span className="text-sm">{new Date(incident.resolved_at * 1000).toLocaleString()}</span>
+              <span className="text-sm">{formatDateTime(incident.resolved_at, timeZone)}</span>
             </div>
           )}
         </div>
@@ -330,7 +330,7 @@ function IncidentDetail({
               <div className="flex items-center gap-3 mb-2">
                 {u.status && <Badge variant="info">{u.status}</Badge>}
                 <span className="text-xs text-slate-400 dark:text-slate-500">
-                  {new Date(u.created_at * 1000).toLocaleString()}
+                  {formatDateTime(u.created_at, timeZone)}
                 </span>
               </div>
               <Markdown text={u.message} />
@@ -395,6 +395,13 @@ export function StatusPage() {
     refetchInterval: 30_000,
   });
 
+  const derivedTitle = statusQuery.data?.site_title || 'Uptimer';
+  const derivedTimeZone = statusQuery.data?.site_timezone || 'UTC';
+
+  useEffect(() => {
+    document.title = derivedTitle;
+  }, [derivedTitle]);
+
   const outagesQuery = useQuery({
     queryKey: ['public-monitor-outages', selectedDay?.monitorId],
     queryFn: () => fetchPublicMonitorOutages(selectedDay?.monitorId as number, { range: '30d', limit: 200 }),
@@ -433,13 +440,19 @@ export function StatusPage() {
   const activeIncidents = data.active_incidents;
   const monitorNames = new Map(data.monitors.map((m) => [m.id, m.name] as const));
 
+  const siteTitle = derivedTitle;
+  const timeZone = derivedTimeZone;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
       <header className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="font-bold text-slate-900 dark:text-slate-100">Uptimer</span>
+          <Link to="/" className="flex flex-col leading-tight min-w-0">
+            <span className="font-bold text-slate-900 dark:text-slate-100 truncate">{siteTitle}</span>
+            {data.site_description ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{data.site_description}</span>
+            ) : null}
           </Link>
           <div className="flex items-center gap-1">
             <ThemeToggle />
@@ -481,7 +494,7 @@ export function StatusPage() {
             <p className="text-white/80 text-sm px-4">Maintenance: {data.banner.maintenance_window.title}</p>
           )}
           <p className="text-white/60 text-xs mt-3">
-            Last updated: {new Date(data.generated_at * 1000).toLocaleString()}
+            Last updated: {formatDateTime(data.generated_at, timeZone)}
           </p>
         </div>
       </div>
@@ -520,8 +533,8 @@ export function StatusPage() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-2">
                         <h4 className="font-semibold text-slate-900 dark:text-slate-100">{w.title}</h4>
                         <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                          {new Date(w.starts_at * 1000).toLocaleString()} –{' '}
-                          {new Date(w.ends_at * 1000).toLocaleString()}
+                          {formatDateTime(w.starts_at, timeZone)} –{' '}
+                          {formatDateTime(w.ends_at, timeZone)}
                         </span>
                       </div>
                       <div className="text-sm text-slate-600 dark:text-slate-300 mb-2">
@@ -546,8 +559,8 @@ export function StatusPage() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-2">
                         <h4 className="font-semibold text-slate-900 dark:text-slate-100">{w.title}</h4>
                         <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                          {new Date(w.starts_at * 1000).toLocaleString()} –{' '}
-                          {new Date(w.ends_at * 1000).toLocaleString()}
+                          {formatDateTime(w.starts_at, timeZone)} –{' '}
+                          {formatDateTime(w.ends_at, timeZone)}
                         </span>
                       </div>
                       <div className="text-sm text-slate-600 dark:text-slate-300">
@@ -582,7 +595,7 @@ export function StatusPage() {
             </h3>
             <div className="space-y-3">
               {activeIncidents.map((it) => (
-                <IncidentCard key={it.id} incident={it} onClick={() => setSelectedIncident(it)} />
+                <IncidentCard key={it.id} incident={it} timeZone={timeZone} onClick={() => setSelectedIncident(it)} />
               ))}
             </div>
           </section>
@@ -596,6 +609,7 @@ export function StatusPage() {
               <MonitorCard
                 key={monitor.id}
                 monitor={monitor}
+                timeZone={timeZone}
                 onSelect={() => setSelectedMonitorId(monitor.id)}
                 onDayClick={(dayStartAt) => setSelectedDay({ monitorId: monitor.id, dayStartAt })}
               />
@@ -612,7 +626,7 @@ export function StatusPage() {
       {/* Footer */}
       <footer className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 text-center text-sm text-slate-400 dark:text-slate-500">
-          Powered by Uptimer
+          Powered by {siteTitle}
         </div>
       </footer>
 
@@ -622,13 +636,14 @@ export function StatusPage() {
       )}
 
       {selectedIncident && (
-        <IncidentDetail incident={selectedIncident} monitorNames={monitorNames} onClose={() => setSelectedIncident(null)} />
+        <IncidentDetail incident={selectedIncident} monitorNames={monitorNames} timeZone={timeZone} onClose={() => setSelectedIncident(null)} />
       )}
 
       {selectedDay && (
         <DayDowntimeModal
           dayStartAt={selectedDay.dayStartAt}
           outages={currentDayOutages}
+          timeZone={timeZone}
           onClose={() => setSelectedDay(null)}
         />
       )}

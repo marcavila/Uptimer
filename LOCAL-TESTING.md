@@ -191,6 +191,32 @@ curl http://localhost:8787/api/v1/admin/monitors \
   -H "Authorization: Bearer your-secure-token-here"
 ```
 
+#### 获取 Settings
+
+```bash
+curl http://localhost:8787/api/v1/admin/settings \
+  -H "Authorization: Bearer your-secure-token-here"
+```
+
+#### 更新 Settings（PATCH）
+
+```bash
+curl -X PATCH http://localhost:8787/api/v1/admin/settings \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secure-token-here" \
+  -d '{
+    "site_title": "My Status",
+    "site_description": "Public status page",
+    "site_timezone": "Asia/Shanghai",
+    "retention_check_results_days": 14,
+    "state_failures_to_down_from_up": 3,
+    "state_successes_to_up_from_down": 2,
+    "admin_default_overview_range": "7d",
+    "admin_default_monitor_range": "30d",
+    "uptime_rating_level": 4
+  }'
+```
+
 #### 更新监控
 
 ```bash

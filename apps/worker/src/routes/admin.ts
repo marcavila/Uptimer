@@ -25,6 +25,7 @@ import { runTcpCheck } from '../monitor/tcp';
 import { dispatchWebhookToChannelLegacy, dispatchWebhookToChannels, type WebhookChannel } from '../notify/webhook';
 import { adminAnalyticsRoutes } from './admin-analytics';
 import { adminExportsRoutes } from './admin-exports';
+import { adminSettingsRoutes } from './admin-settings';
 import {
   createIncidentInputSchema,
   createIncidentUpdateInputSchema,
@@ -47,6 +48,7 @@ adminRoutes.use('*', requireAdmin);
 // Keep analytics endpoints in a separate router to reduce churn in this already-large file.
 adminRoutes.route('/analytics', adminAnalyticsRoutes);
 adminRoutes.route('/exports', adminExportsRoutes);
+adminRoutes.route('/settings', adminSettingsRoutes);
 
 function queuePublicStatusSnapshotRefresh(c: { env: Env; executionCtx: ExecutionContext }) {
   const now = Math.floor(Date.now() / 1000);
