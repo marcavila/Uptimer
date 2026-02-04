@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
@@ -129,6 +129,20 @@ export function AdminDashboard() {
 
   const settings = settingsQuery.data?.settings;
 
+  const [settingsDraft, setSettingsDraft] = useState<AdminSettings | null>(null);
+  const [focusedSetting, setFocusedSetting] = useState<keyof AdminSettings | null>(null);
+
+  useEffect(() => {
+    if (!settings) return;
+
+    // Keep draft in sync with server, but don't clobber the field the user is currently editing.
+    setSettingsDraft((prev) => {
+      if (!prev) return settings;
+      if (!focusedSetting) return settings;
+      return { ...settings, [focusedSetting]: prev[focusedSetting] };
+    });
+  }, [settings, focusedSetting]);
+
   const patchSettingsMut = useMutation({
     mutationFn: (patch: Partial<AdminSettings>) => patchAdminSettings(patch),
     onMutate: async (patch) => {
@@ -172,6 +186,8 @@ export function AdminDashboard() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['admin-settings'], data);
+
+      setSettingsDraft(data.settings);
 
       // Update status query cache so StatusPage header updates instantly.
       const title = data.settings.site_title;
@@ -551,14 +567,15 @@ export function AdminDashboard() {
                 </div>
 
                 <select
-                  value={settings?.uptime_rating_level ?? 3}
+                  value={settingsDraft?.uptime_rating_level ?? 3}
                   onChange={(e) => {
                     const next = Number(e.target.value) as 1 | 2 | 3 | 4 | 5;
-                    const cur = settings?.uptime_rating_level ?? 3;
+                    const cur = settingsDraft?.uptime_rating_level ?? 3;
                     if (next === cur) return;
+                    setSettingsDraft((prev) => (prev ? { ...prev, uptime_rating_level: next } : prev));
                     patchSettingsMut.mutate({ uptime_rating_level: next });
                   }}
-                  disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                  disabled={settingsQuery.isLoading || !settingsDraft}
                   className="border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                 >
                   <option value={1}>Level 1 - Personal / Hobby</option>
@@ -595,12 +612,24 @@ export function AdminDashboard() {
                       Site Title
                     </label>
                     <input
-                      value={settings?.site_title ?? ''}
+                      value={settingsDraft?.site_title ?? ''}
+                      aria-label="Site Title"
                       onChange={(e) => {
-                        const next = sanitizeSiteTitle(e.target.value);
+                        const next = e.target.value.slice(0, 100);
+                        setSettingsDraft((prev) => (prev ? { ...prev, site_title: next } : prev));
+                      }}
+                      onFocus={() => setFocusedSetting('site_title')}
+                      onBlur={(e) => {
+                        setFocusedSetting(null);
+                        const next = sanitizeSiteTitle(e.currentTarget.value);
+                        setSettingsDraft((prev) => (prev ? { ...prev, site_title: next } : prev));
                         patchSettingsMut.mutate({ site_title: next });
                       }}
-                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        (e.currentTarget as HTMLInputElement).blur();
+                      }}
+                      disabled={settingsQuery.isLoading || !settingsDraft}
                       className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                     />
                   </div>
@@ -610,12 +639,24 @@ export function AdminDashboard() {
                       Timezone
                     </label>
                     <input
-                      value={settings?.site_timezone ?? ''}
+                      value={settingsDraft?.site_timezone ?? ''}
+                      aria-label="Timezone"
                       onChange={(e) => {
-                        const next = e.target.value.trim().slice(0, 64) || 'UTC';
+                        const next = e.target.value.slice(0, 64);
+                        setSettingsDraft((prev) => (prev ? { ...prev, site_timezone: next } : prev));
+                      }}
+                      onFocus={() => setFocusedSetting('site_timezone')}
+                      onBlur={(e) => {
+                        setFocusedSetting(null);
+                        const next = e.currentTarget.value.trim().slice(0, 64) || 'UTC';
+                        setSettingsDraft((prev) => (prev ? { ...prev, site_timezone: next } : prev));
                         patchSettingsMut.mutate({ site_timezone: next });
                       }}
-                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        (e.currentTarget as HTMLInputElement).blur();
+                      }}
+                      disabled={settingsQuery.isLoading || !settingsDraft}
                       placeholder="UTC"
                       className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                     />
@@ -628,12 +669,20 @@ export function AdminDashboard() {
                     Site Description
                   </label>
                   <textarea
-                    value={settings?.site_description ?? ''}
+                    value={settingsDraft?.site_description ?? ''}
+                    aria-label="Site Description"
                     onChange={(e) => {
-                      const next = sanitizeSiteDescription(e.target.value);
+                      const next = e.target.value.slice(0, 500);
+                      setSettingsDraft((prev) => (prev ? { ...prev, site_description: next } : prev));
+                    }}
+                    onFocus={() => setFocusedSetting('site_description')}
+                    onBlur={(e) => {
+                      setFocusedSetting(null);
+                      const next = sanitizeSiteDescription(e.currentTarget.value);
+                      setSettingsDraft((prev) => (prev ? { ...prev, site_description: next } : prev));
                       patchSettingsMut.mutate({ site_description: next });
                     }}
-                    disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                    disabled={settingsQuery.isLoading || !settingsDraft}
                     rows={3}
                     className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                   />
@@ -654,12 +703,25 @@ export function AdminDashboard() {
                   type="number"
                   min={1}
                   max={365}
-                  value={settings?.retention_check_results_days ?? 7}
+                  aria-label="Retention Days"
+                  value={settingsDraft?.retention_check_results_days ?? 7}
                   onChange={(e) => {
-                    const next = clampInt(Number(e.target.value), 1, 365);
+                    const raw = Number(e.target.value);
+                    const next = Number.isFinite(raw) ? Math.trunc(raw) : 1;
+                    setSettingsDraft((prev) => (prev ? { ...prev, retention_check_results_days: next } : prev));
+                  }}
+                  onFocus={() => setFocusedSetting('retention_check_results_days')}
+                  onBlur={(e) => {
+                    setFocusedSetting(null);
+                    const next = clampInt(Number(e.currentTarget.value), 1, 365);
+                    setSettingsDraft((prev) => (prev ? { ...prev, retention_check_results_days: next } : prev));
                     patchSettingsMut.mutate({ retention_check_results_days: next });
                   }}
-                  disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }}
+                  disabled={settingsQuery.isLoading || !settingsDraft}
                   className="w-40 border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                 />
               </div>
@@ -683,12 +745,24 @@ export function AdminDashboard() {
                       type="number"
                       min={1}
                       max={10}
-                      value={settings?.state_failures_to_down_from_up ?? 2}
+                      value={settingsDraft?.state_failures_to_down_from_up ?? 2}
                       onChange={(e) => {
-                        const next = clampInt(Number(e.target.value), 1, 10);
+                        const raw = Number(e.target.value);
+                        const next = Number.isFinite(raw) ? Math.trunc(raw) : 1;
+                        setSettingsDraft((prev) => (prev ? { ...prev, state_failures_to_down_from_up: next } : prev));
+                      }}
+                      onFocus={() => setFocusedSetting('state_failures_to_down_from_up')}
+                      onBlur={(e) => {
+                        setFocusedSetting(null);
+                        const next = clampInt(Number(e.currentTarget.value), 1, 10);
+                        setSettingsDraft((prev) => (prev ? { ...prev, state_failures_to_down_from_up: next } : prev));
                         patchSettingsMut.mutate({ state_failures_to_down_from_up: next });
                       }}
-                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        (e.currentTarget as HTMLInputElement).blur();
+                      }}
+                      disabled={settingsQuery.isLoading || !settingsDraft}
                       className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                     />
                   </div>
@@ -700,12 +774,24 @@ export function AdminDashboard() {
                       type="number"
                       min={1}
                       max={10}
-                      value={settings?.state_successes_to_up_from_down ?? 2}
+                      value={settingsDraft?.state_successes_to_up_from_down ?? 2}
                       onChange={(e) => {
-                        const next = clampInt(Number(e.target.value), 1, 10);
+                        const raw = Number(e.target.value);
+                        const next = Number.isFinite(raw) ? Math.trunc(raw) : 1;
+                        setSettingsDraft((prev) => (prev ? { ...prev, state_successes_to_up_from_down: next } : prev));
+                      }}
+                      onFocus={() => setFocusedSetting('state_successes_to_up_from_down')}
+                      onBlur={(e) => {
+                        setFocusedSetting(null);
+                        const next = clampInt(Number(e.currentTarget.value), 1, 10);
+                        setSettingsDraft((prev) => (prev ? { ...prev, state_successes_to_up_from_down: next } : prev));
                         patchSettingsMut.mutate({ state_successes_to_up_from_down: next });
                       }}
-                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return;
+                        (e.currentTarget as HTMLInputElement).blur();
+                      }}
+                      disabled={settingsQuery.isLoading || !settingsDraft}
                       className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                     />
                   </div>
@@ -728,11 +814,13 @@ export function AdminDashboard() {
                       Overview Range
                     </label>
                     <select
-                      value={settings?.admin_default_overview_range ?? '24h'}
+                      value={settingsDraft?.admin_default_overview_range ?? '24h'}
                       onChange={(e) => {
-                        patchSettingsMut.mutate({ admin_default_overview_range: e.target.value as '24h' | '7d' });
+                        const next = e.target.value as '24h' | '7d';
+                        setSettingsDraft((prev) => (prev ? { ...prev, admin_default_overview_range: next } : prev));
+                        patchSettingsMut.mutate({ admin_default_overview_range: next });
                       }}
-                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      disabled={settingsQuery.isLoading || !settingsDraft}
                       className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                     >
                       <option value="24h">24h</option>
@@ -745,11 +833,13 @@ export function AdminDashboard() {
                       Monitor Range
                     </label>
                     <select
-                      value={settings?.admin_default_monitor_range ?? '24h'}
+                      value={settingsDraft?.admin_default_monitor_range ?? '24h'}
                       onChange={(e) => {
-                        patchSettingsMut.mutate({ admin_default_monitor_range: e.target.value as AdminSettings['admin_default_monitor_range'] });
+                        const next = e.target.value as AdminSettings['admin_default_monitor_range'];
+                        setSettingsDraft((prev) => (prev ? { ...prev, admin_default_monitor_range: next } : prev));
+                        patchSettingsMut.mutate({ admin_default_monitor_range: next });
                       }}
-                      disabled={settingsQuery.isLoading || patchSettingsMut.isPending}
+                      disabled={settingsQuery.isLoading || !settingsDraft}
                       className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                     >
                       <option value="24h">24h</option>
