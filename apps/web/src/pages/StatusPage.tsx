@@ -511,11 +511,13 @@ export function StatusPage() {
   const resolvedHistoryQuery = useQuery({
     queryKey: ['public-incidents', 'resolved', 'preview'],
     queryFn: () => fetchPublicIncidents(1, undefined, { resolvedOnly: true }),
+    enabled: statusQuery.isSuccess,
   });
 
   const maintenanceHistoryQuery = useQuery({
     queryKey: ['public-maintenance-windows', 'history', 'preview'],
     queryFn: () => fetchPublicMaintenanceWindows(1),
+    enabled: statusQuery.isSuccess,
   });
 
   const resolvedIncidentPreview = resolvedHistoryQuery.data?.incidents[0] ?? null;
@@ -730,7 +732,7 @@ export function StatusPage() {
               </Link>
             </div>
 
-            {resolvedHistoryQuery.isLoading ? (
+            {resolvedHistoryQuery.isLoading || resolvedHistoryQuery.isFetching ? (
               <div className="ui-skeleton h-28 rounded-xl border border-slate-200/70 dark:border-slate-700/70" />
             ) : resolvedHistoryQuery.isError ? (
               <Card className="p-6 text-center">
@@ -760,7 +762,7 @@ export function StatusPage() {
               </Link>
             </div>
 
-            {maintenanceHistoryQuery.isLoading ? (
+            {maintenanceHistoryQuery.isLoading || maintenanceHistoryQuery.isFetching ? (
               <div className="ui-skeleton h-28 rounded-xl border border-slate-200/70 dark:border-slate-700/70" />
             ) : maintenanceHistoryQuery.isError ? (
               <Card className="p-6 text-center">
