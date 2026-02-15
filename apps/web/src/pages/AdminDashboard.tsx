@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '../app/AuthContext';
+import { useI18n, type MessageKey } from '../app/I18nContext';
+import { useApplyServerLocaleSetting } from '../app/useApplyServerLocaleSetting';
 import { ADMIN_ANALYTICS_PATH } from '../app/adminPaths';
 import {
   ApiError,
@@ -56,6 +58,8 @@ import {
   ThemeToggle,
   cn,
 } from '../components/ui';
+import { incidentImpactLabel, incidentStatusLabel, statusLabel } from '../i18n/labels';
+import { localeLabels } from '../i18n/messages';
 import { formatDateTime } from '../utils/datetime';
 
 type Tab = 'monitors' | 'notifications' | 'incidents' | 'maintenance' | 'settings';
@@ -120,30 +124,30 @@ const tabContainerClass =
 const SETTINGS_ICON_PATH =
   'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z';
 
-const tabs: { key: Tab; label: string; icon: string }[] = [
+const tabs: { key: Tab; labelKey: MessageKey; icon: string }[] = [
   {
     key: 'monitors',
-    label: 'Monitors',
+    labelKey: 'admin_dashboard.tab.monitors',
     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
   },
   {
     key: 'notifications',
-    label: 'Notifications',
+    labelKey: 'admin_dashboard.tab.notifications',
     icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
   },
   {
     key: 'incidents',
-    label: 'Incidents',
+    labelKey: 'admin_dashboard.tab.incidents',
     icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
   },
   {
     key: 'settings',
-    label: 'Settings',
+    labelKey: 'admin_dashboard.tab.settings',
     icon: SETTINGS_ICON_PATH,
   },
   {
     key: 'maintenance',
-    label: 'Maintenance',
+    labelKey: 'admin_dashboard.tab.maintenance',
     icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
   },
 ];
@@ -153,6 +157,13 @@ function formatError(err: unknown): string | undefined {
   if (err instanceof ApiError) return `${err.code}: ${err.message}`;
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function isUnsupportedSiteLocaleError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  if (err.code !== 'INVALID_ARGUMENT') return false;
+  const m = err.message.toLowerCase();
+  return m.includes('site_locale') && m.includes('unrecognized');
 }
 
 function sanitizeSiteTitle(value: string): string {
@@ -244,6 +255,7 @@ function compareMonitors(
 
 export function AdminDashboard() {
   const { logout } = useAuth();
+  const { setLocaleSetting, t } = useI18n();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('monitors');
   const [modal, setModal] = useState<ModalState>({ type: 'none' });
@@ -262,6 +274,8 @@ export function AdminDashboard() {
   const [monitorSortDirection, setMonitorSortDirection] = useState<MonitorSortDirection>('asc');
   const [monitorGroupMode, setMonitorGroupMode] = useState<MonitorGroupMode>('grouped');
   const [monitorGroupFilter, setMonitorGroupFilter] = useState<string>(ALL_GROUPS_FILTER);
+  const [serverLocalePatchSupported, setServerLocalePatchSupported] = useState(true);
+  const [localePatchFallbackActive, setLocalePatchFallbackActive] = useState(false);
 
   const monitorsQuery = useQuery({ queryKey: ['admin-monitors'], queryFn: () => fetchAdminMonitors() });
   const channelsQuery = useQuery({ queryKey: ['admin-channels'], queryFn: () => fetchNotificationChannels() });
@@ -274,6 +288,7 @@ export function AdminDashboard() {
   });
 
   const settings = settingsQuery.data?.settings;
+  useApplyServerLocaleSetting(settings?.site_locale);
   const siteTitle = settings?.site_title?.trim() || 'Uptimer';
 
   useEffect(() => {
@@ -282,6 +297,14 @@ export function AdminDashboard() {
 
   const [settingsDraft, setSettingsDraft] = useState<AdminSettings | null>(null);
   const [focusedSetting, setFocusedSetting] = useState<keyof AdminSettings | null>(null);
+  const localeOptions: Array<{ value: AdminSettings['site_locale']; label: string }> = [
+    { value: 'auto', label: t('admin_settings.locale.option.auto') },
+    { value: 'en', label: localeLabels.en },
+    { value: 'zh-CN', label: localeLabels['zh-CN'] },
+    { value: 'zh-TW', label: localeLabels['zh-TW'] },
+    { value: 'ja', label: localeLabels.ja },
+    { value: 'es', label: localeLabels.es },
+  ];
 
   useEffect(() => {
     if (!settings) return;
@@ -293,6 +316,17 @@ export function AdminDashboard() {
       return { ...settings, [focusedSetting]: prev[focusedSetting] };
     });
   }, [settings, focusedSetting]);
+
+  const applyLocaleLocally = (next: AdminSettings['site_locale']) => {
+    setSettingsDraft((prev) => (prev ? { ...prev, site_locale: next } : prev));
+    setLocaleSetting(next);
+    queryClient.setQueryData<{ settings: AdminSettings }>(['admin-settings'], (old) =>
+      old ? { settings: { ...old.settings, site_locale: next } } : old,
+    );
+    queryClient.setQueryData<StatusResponse>(['status'], (old) =>
+      old ? { ...old, site_locale: next } : old,
+    );
+  };
 
   const patchSettingsMut = useMutation({
     mutationFn: (patch: Partial<AdminSettings>) => patchAdminSettings(patch),
@@ -313,10 +347,12 @@ export function AdminDashboard() {
       if (prevStatus) {
         const nextSiteTitle = typeof patch.site_title === 'string' ? patch.site_title : undefined;
         const nextRating = patch.uptime_rating_level as 1 | 2 | 3 | 4 | 5 | undefined;
+        const nextLocale = patch.site_locale;
 
         queryClient.setQueryData<StatusResponse>(['status'], {
           ...prevStatus,
           ...(nextSiteTitle ? { site_title: nextSiteTitle } : {}),
+          ...(typeof nextLocale === 'string' ? { site_locale: nextLocale } : {}),
           ...(nextRating
             ? {
                 uptime_rating_level: nextRating,
@@ -324,18 +360,33 @@ export function AdminDashboard() {
               }
             : {}),
         });
+
+        if (typeof nextLocale === 'string') {
+          setLocaleSetting(nextLocale);
+        }
       }
 
       return { prevSettings, prevStatus };
     },
-    onError: (_err, _patch, ctx) => {
+    onError: (err, patch, ctx) => {
+      if (typeof patch.site_locale === 'string' && isUnsupportedSiteLocaleError(err)) {
+        setServerLocalePatchSupported(false);
+        setLocalePatchFallbackActive(true);
+        applyLocaleLocally(patch.site_locale);
+        return;
+      }
+
       const prevSettings = (ctx as { prevSettings?: { settings: AdminSettings } } | undefined)?.prevSettings;
       const prevStatus = (ctx as { prevStatus?: StatusResponse } | undefined)?.prevStatus;
 
       if (prevSettings) queryClient.setQueryData(['admin-settings'], prevSettings);
       if (prevStatus) queryClient.setQueryData(['status'], prevStatus);
     },
-    onSuccess: (data) => {
+    onSuccess: (data, patch) => {
+      if (patch.site_locale !== undefined) {
+        setServerLocalePatchSupported(true);
+        setLocalePatchFallbackActive(false);
+      }
       queryClient.setQueryData(['admin-settings'], data);
 
       setSettingsDraft(data.settings);
@@ -343,16 +394,19 @@ export function AdminDashboard() {
       // Update status query cache so StatusPage header updates instantly.
       const title = data.settings.site_title;
       const level = data.settings.uptime_rating_level;
+      const localeSetting = data.settings.site_locale;
       queryClient.setQueryData<StatusResponse>(['status'], (old) =>
         old
           ? {
               ...old,
               site_title: title,
+              site_locale: localeSetting,
               uptime_rating_level: level,
               monitors: old.monitors.map((m) => ({ ...m, uptime_rating_level: level })),
             }
           : old,
       );
+      setLocaleSetting(localeSetting);
     },
   });
 
@@ -738,7 +792,7 @@ export function AdminDashboard() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <header className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
         <div className="mx-auto max-w-[92rem] px-4 py-3 sm:px-6 sm:py-4 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">Admin Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">{t('admin_dashboard.title')}</h1>
           <div className="flex items-center gap-1">
             <ThemeToggle />
             <Link
@@ -753,7 +807,7 @@ export function AdminDashboard() {
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
               </svg>
-              <span className="hidden sm:inline">Analytics</span>
+              <span className="hidden sm:inline">{t('admin_analytics.analytics_title')}</span>
             </Link>
             <Link
               to="/"
@@ -767,7 +821,7 @@ export function AdminDashboard() {
                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span className="hidden sm:inline">Status</span>
+              <span className="hidden sm:inline">{t('common.status')}</span>
             </Link>
             <button
               onClick={logout}
@@ -781,7 +835,7 @@ export function AdminDashboard() {
                   d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                 />
               </svg>
-              <span className="hidden sm:inline">Logout</span>
+              <span className="hidden sm:inline">{t('common.logout')}</span>
             </button>
           </div>
         </div>
@@ -789,23 +843,23 @@ export function AdminDashboard() {
 
       <div className="mx-auto max-w-[92rem] px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
         <div className={`${tabContainerClass} overflow-x-auto scrollbar-hide`}>
-          {tabs.map((t) => (
+          {tabs.map((tabItem) => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              aria-label={t.label}
-              title={t.label}
+              key={tabItem.key}
+              onClick={() => setTab(tabItem.key)}
+              aria-label={t(tabItem.labelKey)}
+              title={t(tabItem.labelKey)}
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-3 py-2 text-base font-medium transition-all sm:gap-2 sm:px-4 whitespace-nowrap',
-                tab === t.key
+                tab === tabItem.key
                   ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900'
                   : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200',
               )}
             >
               <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={t.icon} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tabItem.icon} />
               </svg>
-              <span className="hidden sm:inline">{t.label}</span>
+              <span className="hidden sm:inline">{t(tabItem.labelKey)}</span>
             </button>
           ))}
         </div>
@@ -815,15 +869,15 @@ export function AdminDashboard() {
         {tab === 'monitors' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Monitors</h2>
-              <Button onClick={() => setModal({ type: 'create-monitor' })}>Add Monitor</Button>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('admin_dashboard.tab.monitors')}</h2>
+              <Button onClick={() => setModal({ type: 'create-monitor' })}>{t('admin_dashboard.create_monitor')}</Button>
             </div>
             {testingMonitorId !== null && (
               <Card className="p-3 border-blue-200 bg-blue-50/70 dark:bg-blue-500/10 dark:border-blue-400/30">
                 <div className="text-sm text-blue-700 dark:text-blue-300">
-                  Running test for{' '}
-                  <span className="font-medium">{monitorNameById.get(testingMonitorId) ?? `#${testingMonitorId}`}</span>
-                  ...
+                  {t('admin_dashboard.monitor_test_running', {
+                    name: monitorNameById.get(testingMonitorId) ?? `#${testingMonitorId}`,
+                  })}
                 </div>
               </Card>
             )}
@@ -832,7 +886,7 @@ export function AdminDashboard() {
               <Card className="p-3 border-slate-200 dark:border-slate-600">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                    Last test: {monitorTestFeedback.monitor.name}
+                    {t('admin_dashboard.monitor_test_last', { name: monitorTestFeedback.monitor.name })}
                   </div>
                   <Badge
                     variant={
@@ -845,19 +899,29 @@ export function AdminDashboard() {
                             : 'unknown'
                     }
                   >
-                    {monitorTestFeedback.result.status}
+                    {statusLabel(monitorTestFeedback.result.status, t)}
                   </Badge>
                 </div>
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {formatDateTime(monitorTestFeedback.at, settings?.site_timezone)}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
-                  <span>Attempts: {monitorTestFeedback.result.attempts}</span>
+                  <span>{t('admin_dashboard.monitor_test_attempts', { value: monitorTestFeedback.result.attempts })}</span>
                   <span>
-                    HTTP: {monitorTestFeedback.result.http_status !== null ? monitorTestFeedback.result.http_status : '-'}
+                    {t('admin_dashboard.monitor_test_http', {
+                      value:
+                        monitorTestFeedback.result.http_status !== null
+                          ? monitorTestFeedback.result.http_status
+                          : '-',
+                    })}
                   </span>
                   <span>
-                    Latency: {monitorTestFeedback.result.latency_ms !== null ? `${monitorTestFeedback.result.latency_ms}ms` : '-'}
+                    {t('admin_dashboard.monitor_test_latency', {
+                      value:
+                        monitorTestFeedback.result.latency_ms !== null
+                          ? `${monitorTestFeedback.result.latency_ms}ms`
+                          : '-',
+                    })}
                   </span>
                 </div>
                 <div
@@ -867,7 +931,7 @@ export function AdminDashboard() {
                       : 'text-emerald-700 dark:text-emerald-400'
                   }`}
                 >
-                  {monitorTestFeedback.result.error ?? 'No error returned'}
+                  {monitorTestFeedback.result.error ?? t('admin_dashboard.monitor_test_no_error')}
                 </div>
               </Card>
             )}
@@ -875,7 +939,9 @@ export function AdminDashboard() {
             {monitorTestError && (
               <Card className="p-3 border-red-200 bg-red-50/70 dark:bg-red-500/10 dark:border-red-400/30">
                 <div className="text-sm font-medium text-red-700 dark:text-red-300">
-                  Monitor test failed: {monitorNameById.get(monitorTestError.monitorId) ?? `#${monitorTestError.monitorId}`}
+                  {t('admin_dashboard.monitor_test_failed', {
+                    name: monitorNameById.get(monitorTestError.monitorId) ?? `#${monitorTestError.monitorId}`,
+                  })}
                 </div>
                 <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                   {formatDateTime(monitorTestError.at, settings?.site_timezone)}
@@ -885,9 +951,9 @@ export function AdminDashboard() {
             )}
 
             {monitorsQuery.isLoading ? (
-              <div className="text-slate-500 dark:text-slate-400">Loading...</div>
+              <div className="text-slate-500 dark:text-slate-400">{t('common.loading')}</div>
             ) : !monitorsQuery.data?.monitors.length ? (
-              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">No monitors yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">{t('admin_dashboard.no_monitors_yet')}</Card>
             ) : (
               <div className="grid gap-4 lg:grid-cols-[18rem,minmax(0,1fr)] 2xl:grid-cols-[21rem,minmax(0,1fr)]">
                 <div className="order-2 space-y-4 self-start lg:order-1 lg:sticky lg:top-6">
@@ -1200,9 +1266,9 @@ export function AdminDashboard() {
                                                     : 'unknown'
                                           }
                                         >
-                                          {m.status}
+                                          {statusLabel(m.status, t)}
                                         </Badge>
-                                        {!m.is_active && <Badge variant="unknown">inactive</Badge>}
+                                        {!m.is_active && <Badge variant="unknown">{t('common.inactive')}</Badge>}
                                       </div>
                                     </td>
                                     <td className="px-3 sm:px-4 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -1232,7 +1298,7 @@ export function AdminDashboard() {
                                           disabled={testMonitorMut.isPending}
                                           className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-blue-600 hover:bg-blue-50 hover:text-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 disabled:opacity-50')}
                                         >
-                                          {testingMonitorId === m.id ? 'Testing...' : 'Test'}
+                                          {testingMonitorId === m.id ? t('common.testing') : t('common.test')}
                                         </button>
                                         <button
                                           onClick={() => {
@@ -1249,7 +1315,7 @@ export function AdminDashboard() {
                                           }
                                           className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-amber-700 hover:bg-amber-50 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-200 disabled:opacity-50')}
                                         >
-                                          {m.status === 'paused' ? 'Resume' : 'Pause'}
+                                          {m.status === 'paused' ? t('common.resume') : t('common.pause')}
                                         </button>
                                         <button
                                           onClick={() => {
@@ -1259,13 +1325,13 @@ export function AdminDashboard() {
                                           }}
                                           className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200')}
                                         >
-                                          Edit
+                                          {t('common.edit')}
                                         </button>
                                         <button
-                                          onClick={() => confirm('Delete?') && deleteMonitorMut.mutate(m.id)}
+                                          onClick={() => confirm(`${t('common.delete')}?`) && deleteMonitorMut.mutate(m.id)}
                                           className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300')}
                                         >
-                                          Delete
+                                          {t('common.delete')}
                                         </button>
                                       </div>
                                     </td>
@@ -1287,15 +1353,15 @@ export function AdminDashboard() {
         {tab === 'notifications' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Notification Channels</h2>
-              <Button onClick={() => setModal({ type: 'create-channel' })}>Add Channel</Button>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('admin_dashboard.notification_channels_title')}</h2>
+              <Button onClick={() => setModal({ type: 'create-channel' })}>{t('admin_dashboard.create_channel')}</Button>
             </div>
             {testingChannelId !== null && (
               <Card className="p-3 border-blue-200 bg-blue-50/70 dark:bg-blue-500/10 dark:border-blue-400/30">
                 <div className="text-sm text-blue-700 dark:text-blue-300">
-                  Sending test webhook to{' '}
-                  <span className="font-medium">{channelNameById.get(testingChannelId) ?? `#${testingChannelId}`}</span>
-                  ...
+                  {t('admin_dashboard.webhook_test_running', {
+                    name: channelNameById.get(testingChannelId) ?? `#${testingChannelId}`,
+                  })}
                 </div>
               </Card>
             )}
@@ -1304,7 +1370,9 @@ export function AdminDashboard() {
               <Card className="p-3 border-slate-200 dark:border-slate-600">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                    Last webhook test: {channelNameById.get(channelTestFeedback.channelId) ?? `#${channelTestFeedback.channelId}`}
+                    {t('admin_dashboard.webhook_test_last', {
+                      name: channelNameById.get(channelTestFeedback.channelId) ?? `#${channelTestFeedback.channelId}`,
+                    })}
                   </div>
                   <Badge
                     variant={
@@ -1315,16 +1383,16 @@ export function AdminDashboard() {
                           : 'unknown'
                     }
                   >
-                    {channelTestFeedback.delivery?.status ?? 'unknown'}
+                    {channelTestFeedback.delivery?.status ?? t('admin_dashboard.webhook_test_unknown')}
                   </Badge>
                 </div>
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {formatDateTime(channelTestFeedback.at, settings?.site_timezone)}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
-                  <span>HTTP: {channelTestFeedback.delivery?.http_status ?? '-'}</span>
+                  <span>{t('admin_dashboard.webhook_test_http', { value: channelTestFeedback.delivery?.http_status ?? '-' })}</span>
                   <span className="max-w-full truncate" title={channelTestFeedback.eventKey}>
-                    Event key: {channelTestFeedback.eventKey}
+                    {t('admin_dashboard.webhook_test_event_key', { value: channelTestFeedback.eventKey })}
                   </span>
                 </div>
                 <div
@@ -1346,7 +1414,9 @@ export function AdminDashboard() {
             {channelTestError && (
               <Card className="p-3 border-red-200 bg-red-50/70 dark:bg-red-500/10 dark:border-red-400/30">
                 <div className="text-sm font-medium text-red-700 dark:text-red-300">
-                  Webhook test failed: {channelNameById.get(channelTestError.channelId) ?? `#${channelTestError.channelId}`}
+                  {t('admin_dashboard.webhook_test_failed', {
+                    name: channelNameById.get(channelTestError.channelId) ?? `#${channelTestError.channelId}`,
+                  })}
                 </div>
                 <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                   {formatDateTime(channelTestError.at, settings?.site_timezone)}
@@ -1356,19 +1426,19 @@ export function AdminDashboard() {
             )}
 
             {channelsQuery.isLoading ? (
-              <div className="text-slate-500 dark:text-slate-400">Loading...</div>
+              <div className="text-slate-500 dark:text-slate-400">{t('common.loading')}</div>
             ) : !channelsQuery.data?.notification_channels.length ? (
-              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">No channels yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">{t('admin_dashboard.no_channels_yet')}</Card>
             ) : (
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[500px]">
                     <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
                       <tr>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Name</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Type</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">URL</th>
-                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Actions</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.name')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.type')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.url')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -1391,19 +1461,19 @@ export function AdminDashboard() {
                                 disabled={testChannelMut.isPending}
                                 className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-blue-600 hover:bg-blue-50 hover:text-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 disabled:opacity-50')}
                               >
-                                {testingChannelId === ch.id ? 'Testing...' : 'Test'}
+                                {testingChannelId === ch.id ? t('common.testing') : t('common.test')}
                               </button>
                               <button
                                 onClick={() => setModal({ type: 'edit-channel', channel: ch })}
                                 className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200')}
                               >
-                                Edit
+                                {t('common.edit')}
                               </button>
                               <button
-                                onClick={() => confirm(`Delete "${ch.name}"?`) && deleteChannelMut.mutate(ch.id)}
+                                onClick={() => confirm(`${t('common.delete')} "${ch.name}"?`) && deleteChannelMut.mutate(ch.id)}
                                 className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300')}
                               >
-                                Delete
+                                {t('common.delete')}
                               </button>
                             </div>
                           </td>
@@ -1420,15 +1490,15 @@ export function AdminDashboard() {
         {tab === 'settings' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Settings</h2>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('admin_dashboard.tab.settings')}</h2>
             </div>
 
             <Card className="p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Uptime Color Rating</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('admin_settings.uptime_rating.title')}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Controls the color thresholds for daily bars and 30d uptime.
+                    {t('admin_settings.uptime_rating.help')}
                   </div>
                 </div>
 
@@ -1444,42 +1514,75 @@ export function AdminDashboard() {
                   disabled={settingsQuery.isLoading || !settingsDraft}
                   className="ui-select w-full sm:w-[21rem] disabled:opacity-50"
                 >
-                  <option value={1}>Level 1 - Personal / Hobby</option>
-                  <option value={2}>Level 2 - Basic Business / Content</option>
-                  <option value={3}>Level 3 - Production / SaaS</option>
-                  <option value={4}>Level 4 - High Availability / Critical</option>
-                  <option value={5}>Level 5 - Financial / Mission Critical</option>
+                  <option value={1}>{t('admin_settings.uptime_rating.level_1')}</option>
+                  <option value={2}>{t('admin_settings.uptime_rating.level_2')}</option>
+                  <option value={3}>{t('admin_settings.uptime_rating.level_3')}</option>
+                  <option value={4}>{t('admin_settings.uptime_rating.level_4')}</option>
+                  <option value={5}>{t('admin_settings.uptime_rating.level_5')}</option>
                 </select>
               </div>
 
               {settingsQuery.isError && (
-                <div className="mt-3 text-sm text-red-600 dark:text-red-400">Failed to load settings</div>
+                <div className="mt-3 text-sm text-red-600 dark:text-red-400">{t('admin_dashboard.failed_load_settings')}</div>
               )}
 
-              {patchSettingsMut.isError && (
+              {patchSettingsMut.isError && !localePatchFallbackActive && (
                 <div className="mt-3 text-sm text-red-600 dark:text-red-400">
-                  {formatError(patchSettingsMut.error) ?? 'Failed to update settings'}
+                  {formatError(patchSettingsMut.error) ?? t('admin_dashboard.failed_update_settings')}
                 </div>
+              )}
+            </Card>
+
+            <Card className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('admin_settings.locale.title')}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {t('admin_settings.locale.help')}
+                  </div>
+                </div>
+
+                <select
+                  value={settingsDraft?.site_locale ?? 'auto'}
+                  onChange={(e) => {
+                    const next = e.target.value as AdminSettings['site_locale'];
+                    applyLocaleLocally(next);
+                    if (serverLocalePatchSupported) {
+                      patchSettingsMut.mutate({ site_locale: next });
+                    }
+                  }}
+                  disabled={settingsQuery.isLoading || !settingsDraft}
+                  className="ui-select w-full sm:w-[21rem] disabled:opacity-50"
+                >
+                  {localeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {localePatchFallbackActive && (
+                <div className="mt-3 text-xs text-amber-700 dark:text-amber-300">{t('admin_settings.locale.local_only')}</div>
               )}
             </Card>
 
             <Card className="p-4 sm:p-5">
               <div className="space-y-4">
                 <div>
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Site Branding</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('admin_settings.branding.title')}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Controls the status page title and description.
+                    {t('admin_settings.branding.help')}
                   </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                      Site Title
+                      {t('admin_settings.branding.site_title')}
                     </label>
                     <input
                       value={settingsDraft?.site_title ?? ''}
-                      aria-label="Site Title"
+                      aria-label={t('admin_settings.branding.site_title')}
                       onChange={(e) => {
                         const next = e.target.value.slice(0, 100);
                         setSettingsDraft((prev) => (prev ? { ...prev, site_title: next } : prev));
@@ -1502,11 +1605,11 @@ export function AdminDashboard() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                      Timezone
+                      {t('admin_settings.branding.timezone')}
                     </label>
                     <input
                       value={settingsDraft?.site_timezone ?? ''}
-                      aria-label="Timezone"
+                      aria-label={t('admin_settings.branding.timezone')}
                       onChange={(e) => {
                         const next = e.target.value.slice(0, 64);
                         setSettingsDraft((prev) => (prev ? { ...prev, site_timezone: next } : prev));
@@ -1526,17 +1629,17 @@ export function AdminDashboard() {
                       placeholder="UTC"
                       className="w-full border dark:border-slate-600 rounded px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
                     />
-                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">IANA name (e.g. UTC, Asia/Shanghai)</div>
+                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('admin_settings.branding.timezone_help')}</div>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    Site Description
+                    {t('admin_settings.branding.site_description')}
                   </label>
                   <textarea
                     value={settingsDraft?.site_description ?? ''}
-                    aria-label="Site Description"
+                    aria-label={t('admin_settings.branding.site_description')}
                     onChange={(e) => {
                       const next = e.target.value.slice(0, 500);
                       setSettingsDraft((prev) => (prev ? { ...prev, site_description: next } : prev));
@@ -1559,9 +1662,9 @@ export function AdminDashboard() {
             <Card className="p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Retention</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('admin_settings.retention.title')}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    How many days of raw check results to keep.
+                    {t('admin_settings.retention.help')}
                   </div>
                 </div>
 
@@ -1569,7 +1672,7 @@ export function AdminDashboard() {
                   type="number"
                   min={1}
                   max={365}
-                  aria-label="Retention Days"
+                  aria-label={t('admin_settings.retention.days')}
                   value={settingsDraft?.retention_check_results_days ?? 7}
                   onChange={(e) => {
                     const raw = Number(e.target.value);
@@ -1596,16 +1699,16 @@ export function AdminDashboard() {
             <Card className="p-4 sm:p-5">
               <div className="space-y-4">
                 <div>
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">State Machine Defaults</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('admin_settings.state_machine.title')}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Global thresholds for UP/DOWN transitions.
+                    {t('admin_settings.state_machine.help')}
                   </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                      Failures to mark DOWN
+                      {t('admin_settings.state_machine.failures_to_down')}
                     </label>
                     <input
                       type="number"
@@ -1634,7 +1737,7 @@ export function AdminDashboard() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                      Successes to mark UP
+                      {t('admin_settings.state_machine.successes_to_up')}
                     </label>
                     <input
                       type="number"
@@ -1668,16 +1771,16 @@ export function AdminDashboard() {
             <Card className="p-4 sm:p-5">
               <div className="space-y-4">
                 <div>
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Admin Defaults</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('admin_settings.defaults.title')}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Default ranges used in Analytics.
+                    {t('admin_settings.defaults.help')}
                   </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                      Overview Range
+                      {t('admin_settings.defaults.overview_range')}
                     </label>
                     <select
                       value={settingsDraft?.admin_default_overview_range ?? '24h'}
@@ -1696,7 +1799,7 @@ export function AdminDashboard() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                      Monitor Range
+                      {t('admin_settings.defaults.monitor_range')}
                     </label>
                     <select
                       value={settingsDraft?.admin_default_monitor_range ?? '24h'}
@@ -1723,24 +1826,24 @@ export function AdminDashboard() {
         {tab === 'incidents' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Incidents</h2>
-              <Button onClick={() => setModal({ type: 'create-incident' })}>Create Incident</Button>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('admin_dashboard.tab.incidents')}</h2>
+              <Button onClick={() => setModal({ type: 'create-incident' })}>{t('admin_dashboard.create_incident')}</Button>
             </div>
             {incidentsQuery.isLoading ? (
-              <div className="text-slate-500 dark:text-slate-400">Loading...</div>
+              <div className="text-slate-500 dark:text-slate-400">{t('common.loading')}</div>
             ) : !incidentsQuery.data?.incidents.length ? (
-              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">No incidents yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">{t('admin_dashboard.no_incidents_yet')}</Card>
             ) : (
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[650px]">
                     <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
                       <tr>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Title</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monitors</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Status</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Impact</th>
-                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Actions</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.title_label')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.monitors')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.state')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.impact')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -1751,11 +1854,13 @@ export function AdminDashboard() {
                             {it.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}
                           </td>
                           <td className="px-3 sm:px-4 py-3">
-                            <Badge variant={it.status === 'resolved' ? 'up' : 'paused'}>{it.status}</Badge>
+                            <Badge variant={it.status === 'resolved' ? 'up' : 'paused'}>
+                              {it.status === 'resolved' ? t('incident_status.resolved') : incidentStatusLabel(it.status, t)}
+                            </Badge>
                           </td>
                           <td className="px-3 sm:px-4 py-3">
                             <Badge variant={it.impact === 'critical' ? 'down' : it.impact === 'major' ? 'down' : 'paused'}>
-                              {it.impact}
+                              {incidentImpactLabel(it.impact, t)}
                             </Badge>
                           </td>
                           <td className="px-3 sm:px-4 py-3 text-right whitespace-nowrap">
@@ -1775,10 +1880,10 @@ export function AdminDashboard() {
                                 Resolve
                               </button>
                               <button
-                                onClick={() => confirm(`Delete "${it.title}"?`) && deleteIncidentMut.mutate(it.id)}
+                                onClick={() => confirm(`${t('common.delete')} "${it.title}"?`) && deleteIncidentMut.mutate(it.id)}
                                 className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300')}
                               >
-                                Delete
+                                {t('common.delete')}
                               </button>
                             </div>
                           </td>
@@ -1795,37 +1900,50 @@ export function AdminDashboard() {
         {tab === 'maintenance' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Maintenance Windows</h2>
-              <Button onClick={() => setModal({ type: 'create-maintenance' })}>Create Window</Button>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('admin_dashboard.maintenance_windows_title')}</h2>
+              <Button onClick={() => setModal({ type: 'create-maintenance' })}>{t('admin_dashboard.create_maintenance')}</Button>
             </div>
             {maintenanceQuery.isLoading ? (
-              <div className="text-slate-500 dark:text-slate-400">Loading...</div>
+              <div className="text-slate-500 dark:text-slate-400">{t('common.loading')}</div>
             ) : !maintenanceQuery.data?.maintenance_windows.length ? (
-              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">No maintenance windows yet</Card>
+              <Card className="p-6 sm:p-8 text-center text-slate-500 dark:text-slate-400">{t('admin_dashboard.no_maintenance_yet')}</Card>
             ) : (
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[650px]">
                     <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
                       <tr>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Title</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Monitors</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Schedule</th>
-                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">State</th>
-                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Actions</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.title_label')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.monitors')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.schedule')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.state')}</th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                       {maintenanceQuery.data.maintenance_windows.map((w) => {
                         const now = Math.floor(Date.now() / 1000);
-                        const state = w.starts_at <= now && w.ends_at > now ? 'Active' : w.starts_at > now ? 'Upcoming' : 'Ended';
+                        const state =
+                          w.starts_at <= now && w.ends_at > now
+                            ? t('common.active')
+                            : w.starts_at > now
+                              ? t('common.upcoming')
+                              : t('common.ended');
                         return (
                           <tr key={w.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                             <td className="px-3 sm:px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{w.title}</td>
                             <td className="px-3 sm:px-4 py-3 text-sm text-slate-500 dark:text-slate-400 truncate max-w-[120px]">{w.monitor_ids.map((id) => monitorNameById.get(id) ?? `#${id}`).join(', ')}</td>
                             <td className="px-3 sm:px-4 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(w.starts_at, settings?.site_timezone)} – {formatDateTime(w.ends_at, settings?.site_timezone)}</td>
                             <td className="px-3 sm:px-4 py-3">
-                              <Badge variant={state === 'Active' ? 'maintenance' : state === 'Upcoming' ? 'paused' : 'unknown'}>
+                              <Badge
+                                variant={
+                                  state === t('common.active')
+                                    ? 'maintenance'
+                                    : state === t('common.upcoming')
+                                      ? 'paused'
+                                      : 'unknown'
+                                }
+                              >
                                 {state}
                               </Badge>
                             </td>
@@ -1835,13 +1953,13 @@ export function AdminDashboard() {
                                   onClick={() => setModal({ type: 'edit-maintenance', window: w })}
                                   className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200')}
                                 >
-                                  Edit
+                                  {t('common.edit')}
                                 </button>
                                 <button
-                                  onClick={() => confirm(`Delete "${w.title}"?`) && deleteMaintenanceMut.mutate(w.id)}
+                                  onClick={() => confirm(`${t('common.delete')} "${w.title}"?`) && deleteMaintenanceMut.mutate(w.id)}
                                   className={cn(TABLE_ACTION_BUTTON_CLASS, 'text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300')}
                                 >
-                                  Delete
+                                  {t('common.delete')}
                                 </button>
                               </div>
                             </td>
@@ -1861,15 +1979,15 @@ export function AdminDashboard() {
         <div className={MODAL_OVERLAY_CLASS}>
           <div className={`${MODAL_PANEL_CLASS} sm:max-w-md p-5 sm:p-6`}>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-5">
-              {modal.type === 'create-monitor' && 'Create Monitor'}
-              {modal.type === 'edit-monitor' && 'Edit Monitor'}
-              {modal.type === 'create-channel' && 'Create Channel'}
-              {modal.type === 'edit-channel' && 'Edit Channel'}
-              {modal.type === 'create-incident' && 'Create Incident'}
-              {modal.type === 'add-incident-update' && 'Post Update'}
-              {modal.type === 'resolve-incident' && 'Resolve Incident'}
-              {modal.type === 'create-maintenance' && 'Create Maintenance'}
-              {modal.type === 'edit-maintenance' && 'Edit Maintenance'}
+              {modal.type === 'create-monitor' && t('admin_dashboard.create_monitor')}
+              {modal.type === 'edit-monitor' && t('admin_dashboard.edit_monitor')}
+              {modal.type === 'create-channel' && t('admin_dashboard.create_channel')}
+              {modal.type === 'edit-channel' && t('admin_dashboard.edit_channel')}
+              {modal.type === 'create-incident' && t('admin_dashboard.create_incident')}
+              {modal.type === 'add-incident-update' && t('admin_dashboard.post_update')}
+              {modal.type === 'resolve-incident' && t('admin_dashboard.resolve_incident')}
+              {modal.type === 'create-maintenance' && t('admin_dashboard.create_maintenance')}
+              {modal.type === 'edit-maintenance' && t('admin_dashboard.edit_maintenance')}
             </h2>
 
             {(modal.type === 'create-monitor' || modal.type === 'edit-monitor') && (

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import type { AdminMonitor, CreateMonitorInput, MonitorType, PatchMonitorInput } from '../api/types';
+import { useI18n } from '../app/I18nContext';
 import {
   Button,
   FIELD_HELP_CLASS,
@@ -153,6 +154,7 @@ function parseExpectedStatusInput(
 }
 
 export function MonitorForm(props: CreateProps | EditProps) {
+  const { t } = useI18n();
   const monitor = props.monitor;
   const groupOptions = useMemo(
     () =>
@@ -492,10 +494,10 @@ export function MonitorForm(props: CreateProps | EditProps) {
 
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={props.onCancel} className="flex-1">
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={props.isLoading || !canSubmit} className="flex-1">
-          {props.isLoading ? 'Saving...' : monitor ? 'Update' : 'Create'}
+          {props.isLoading ? t('common.saving') : monitor ? t('common.update') : t('common.create')}
         </Button>
       </div>
     </form>

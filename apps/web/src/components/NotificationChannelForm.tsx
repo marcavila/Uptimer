@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { CreateNotificationChannelInput, NotificationChannel, WebhookChannelConfig } from '../api/types';
+import { useI18n } from '../app/I18nContext';
 import {
   Button,
   FIELD_HELP_CLASS,
@@ -58,6 +59,7 @@ function toPayloadType(value: string): NonNullable<WebhookChannelConfig['payload
 }
 
 export function NotificationChannelForm({ channel, onSubmit, onCancel, isLoading, error }: NotificationChannelFormProps) {
+  const { t } = useI18n();
   const [name, setName] = useState(channel?.name ?? '');
   const [url, setUrl] = useState(channel?.config_json.url ?? '');
   const [method, setMethod] = useState<NonNullable<WebhookChannelConfig['method']>>(
@@ -336,10 +338,10 @@ export function NotificationChannelForm({ channel, onSubmit, onCancel, isLoading
 
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={isLoading || !canSubmit} className="flex-1">
-          {isLoading ? 'Saving...' : channel ? 'Update' : 'Create'}
+          {isLoading ? t('common.saving') : channel ? t('common.update') : t('common.create')}
         </Button>
       </div>
     </form>
