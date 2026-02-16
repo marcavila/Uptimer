@@ -10,7 +10,7 @@
 
 Monitor your services, display real-time status to visitors, and get notified when things go down — all running on Cloudflare Workers + Pages + D1 with zero ops.
 
-[Getting Started](#getting-started) · [Deploy](#deploy-to-cloudflare) · [Documentation](#documentation) · [Contributing](CONTRIBUTING.md)
+[Quick Deploy](#quick-deploy-5-steps) · [Local Dev](#local-development) · [Documentation](#documentation) · [Contributing](CONTRIBUTING.md)
 
 English | **[中文](README.zh-CN.md)**
 
@@ -91,18 +91,74 @@ Admin ─────────►│  Workers (Hono API)                     
 | CI/CD | GitHub Actions |
 | Package Manager | pnpm (monorepo) |
 
-## Getting Started
+## Quick Deploy (5 Steps)
+
+Deploy your own Uptimer instance without touching any code or config files:
+
+### Step 1 — Fork
+
+Click the **Fork** button at the top-right of this repository to create your own copy.
+
+### Step 2 — Create a Cloudflare API Token
+
+1. Go to [Cloudflare Dashboard → API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+2. Click **Create Token** → use the **Edit Cloudflare Workers** template
+3. Add the following permissions:
+   - `Account / Cloudflare Pages / Edit`
+   - `Account / D1 / Edit`
+4. Copy the generated token
+
+### Step 3 — Add GitHub Secrets
+
+Go to your forked repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**, and add:
+
+| Secret Name | Value | Required |
+|---|---|:---:|
+| `CLOUDFLARE_API_TOKEN` | Token from Step 2 | Yes |
+| `UPTIMER_ADMIN_TOKEN` | Any strong string (this is your admin dashboard password) | Yes |
+| `CLOUDFLARE_ACCOUNT_ID` | Your [Cloudflare Account ID](https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/) | Recommended |
+
+### Step 4 — Run GitHub Actions
+
+Go to **Actions** → **Deploy to Cloudflare** → **Run workflow** (or simply push a commit to `main`/`master`).
+
+The workflow automatically:
+- Creates the D1 database and runs migrations
+- Deploys the Worker (API + cron-based monitoring)
+- Builds and deploys the Pages frontend (status page)
+- Injects the admin token as a Worker secret
+
+### Step 5 — Visit Your Status Page
+
+Once the workflow succeeds (usually ~2 min for first deploy):
+
+- **Status page** → `https://<your-repo-name>.pages.dev`
+- **Admin dashboard** → `https://<your-repo-name>.pages.dev/admin`
+- **API** → `https://<your-repo-name>.workers.dev/api/v1/public/status`
+
+Log in to the admin dashboard with the `UPTIMER_ADMIN_TOKEN` you set, and start adding monitors.
+
+> **Staying up to date** — Since you deploy from your own fork, you can [sync with upstream](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork) at any time. The deploy workflow will run automatically after each sync.
+
+> For advanced options (custom domain, resource naming, admin path), see the [Deployment Guide](docs/deploy-github-actions.md).
+
+---
+
+## Local Development
+
+<details>
+<summary>Click to expand local development setup</summary>
 
 ### Prerequisites
 
 - Node.js >= 22.14.0
 - pnpm >= 10.8.1
 
-### Local Development
+### Setup
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/VrianCao/Uptimer.git
+git clone https://github.com/<your-username>/Uptimer.git
 cd Uptimer
 pnpm install
 
@@ -121,35 +177,7 @@ Default addresses:
 
 > For the full local development guide (seed data, API testing, troubleshooting), see [Develop/LOCAL-TESTING.md](Develop/LOCAL-TESTING.md).
 
-## Deploy to Cloudflare
-
-The fastest way to deploy is via GitHub Actions — push to `main`/`master` and the included workflow handles everything automatically.
-
-### Minimum Setup
-
-1. **Add repository secret**: `CLOUDFLARE_API_TOKEN`
-2. **Add repository secret**: `UPTIMER_ADMIN_TOKEN` (admin dashboard access key)
-3. **Recommended secret**: `CLOUDFLARE_ACCOUNT_ID`
-4. **Push to `main`** (or manually trigger the Deploy workflow)
-
-The workflow will:
-- Create/migrate the D1 database
-- Deploy the Worker with cron triggers
-- Build and deploy the Pages frontend
-- Inject secrets (ADMIN_TOKEN)
-
-> For detailed configuration options, custom naming, and troubleshooting, see the [Deployment Guide](docs/deploy-github-actions.md).
-
-### Post-deploy Verification
-
-```bash
-# Public status API
-curl https://your-worker.workers.dev/api/v1/public/status
-
-# Admin API (replace token)
-curl https://your-worker.workers.dev/api/v1/admin/monitors \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
-```
+</details>
 
 ## Documentation
 

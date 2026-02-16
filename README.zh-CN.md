@@ -10,7 +10,7 @@
 
 监控你的服务，向访客展示实时状态，并在服务异常时发送通知 — 全部运行在 Cloudflare Workers + Pages + D1 上，零运维。
 
-[快速开始](#快速开始) · [部署](#部署到-cloudflare) · [文档](#文档) · [贡献指南](CONTRIBUTING.zh-CN.md)
+[快速部署](#快速部署5-步完成) · [本地开发](#本地开发) · [文档](#文档) · [贡献指南](CONTRIBUTING.zh-CN.md)
 
 **[English](README.md)** | 中文
 
@@ -91,18 +91,74 @@ Admin ─────────►│  Workers (Hono API)                     
 | CI/CD | GitHub Actions |
 | 包管理 | pnpm（monorepo） |
 
-## 快速开始
+## 快速部署（5 步完成）
+
+无需修改任何代码或配置文件，即可部署专属于你的 Uptimer 实例：
+
+### 第 1 步 — Fork 仓库
+
+点击本仓库右上角的 **Fork** 按钮，创建你自己的副本。
+
+### 第 2 步 — 创建 Cloudflare API Token
+
+1. 前往 [Cloudflare Dashboard → API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+2. 点击 **Create Token** → 使用 **Edit Cloudflare Workers** 模板
+3. 添加以下权限：
+   - `Account / Cloudflare Pages / Edit`
+   - `Account / D1 / Edit`
+4. 复制生成的 Token
+
+### 第 3 步 — 添加 GitHub Secrets
+
+进入你 Fork 的仓库 → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**，添加：
+
+| Secret 名称 | 值 | 是否必填 |
+|---|---|:---:|
+| `CLOUDFLARE_API_TOKEN` | 第 2 步获取的 Token | 必填 |
+| `UPTIMER_ADMIN_TOKEN` | 任意强密码字符串（用于登录管理后台） | 必填 |
+| `CLOUDFLARE_ACCOUNT_ID` | 你的 [Cloudflare Account ID](https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/) | 推荐 |
+
+### 第 4 步 — 运行 GitHub Actions
+
+进入 **Actions** → **Deploy to Cloudflare** → **Run workflow**（或直接向 `main`/`master` 推送一次提交）。
+
+工作流会自动完成：
+- 创建 D1 数据库并执行迁移
+- 部署 Worker（API + 定时监控任务）
+- 构建并部署 Pages 前端（状态页）
+- 注入管理密钥为 Worker Secret
+
+### 第 5 步 — 访问你的状态页
+
+工作流运行成功后（首次部署通常约 2 分钟）：
+
+- **状态页** → `https://<你的仓库名>.pages.dev`
+- **管理后台** → `https://<你的仓库名>.pages.dev/admin`
+- **API** → `https://<你的仓库名>.workers.dev/api/v1/public/status`
+
+使用你设置的 `UPTIMER_ADMIN_TOKEN` 登录管理后台，即可开始添加监控项。
+
+> **保持更新** — 由于你从自己的 Fork 部署，随时可以[同步上游仓库](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork)获取最新功能。每次同步后，部署工作流会自动运行。
+
+> 高级选项（自定义域名、资源命名、管理路径等）请参阅[部署指南](docs/deploy-github-actions.zh-CN.md)。
+
+---
+
+## 本地开发
+
+<details>
+<summary>点击展开本地开发环境配置</summary>
 
 ### 前置要求
 
 - Node.js >= 22.14.0
 - pnpm >= 10.8.1
 
-### 本地开发
+### 配置步骤
 
 ```bash
 # 1. 克隆并安装依赖
-git clone https://github.com/VrianCao/Uptimer.git
+git clone https://github.com/<your-username>/Uptimer.git
 cd Uptimer
 pnpm install
 
@@ -121,35 +177,7 @@ pnpm dev
 
 > 完整的本地开发指南（种子数据、API 测试、常见问题）请参阅 [Develop/LOCAL-TESTING.md](Develop/LOCAL-TESTING.md)。
 
-## 部署到 Cloudflare
-
-最快的部署方式是通过 GitHub Actions — 推送到 `main`/`master` 分支，内置的工作流会自动完成所有操作。
-
-### 最小配置
-
-1. **添加仓库密钥**：`CLOUDFLARE_API_TOKEN`
-2. **添加仓库密钥**：`UPTIMER_ADMIN_TOKEN`（管理面板访问密钥）
-3. **推荐密钥**：`CLOUDFLARE_ACCOUNT_ID`
-4. **推送到 `main`**（或手动触发 Deploy 工作流）
-
-工作流会自动：
-- 创建/迁移 D1 数据库
-- 部署 Worker 与 Cron 触发器
-- 构建并部署 Pages 前端
-- 注入密钥（ADMIN_TOKEN）
-
-> 详细的配置选项、自定义命名与故障排除请参阅[部署指南](docs/deploy-github-actions.zh-CN.md)。
-
-### 部署后验证
-
-```bash
-# 公开状态 API
-curl https://your-worker.workers.dev/api/v1/public/status
-
-# 管理 API（替换 token）
-curl https://your-worker.workers.dev/api/v1/admin/monitors \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
-```
+</details>
 
 ## 文档
 
