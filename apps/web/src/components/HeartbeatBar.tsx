@@ -183,7 +183,11 @@ function aggregateHeartbeats(heartbeats: Heartbeat[], slots: number): DisplayHea
         worst = hb;
       }
 
-      if (hb.status === 'up' && typeof hb.latency_ms === 'number' && Number.isFinite(hb.latency_ms)) {
+      if (
+        hb.status === 'up' &&
+        typeof hb.latency_ms === 'number' &&
+        Number.isFinite(hb.latency_ms)
+      ) {
         latencySum += hb.latency_ms;
         latencyCount++;
       }
