@@ -55,6 +55,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Quality gates
+        run: |
+          pnpm -r lint
+          pnpm -r typecheck
+          pnpm -r --if-present test
+
       # ---------------------------------------------------------------------
       # Configuration model (important for fork sync compatibility / idempotence)
       #

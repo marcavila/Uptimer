@@ -4,26 +4,15 @@
 
 ---
 
-## 参考项目：UptimeFlare（“老大哥”）
-
-本仓库内的 `UptimeFlare/` 目录用于参考 Cloudflare Workers / Pages / D1 的用法与性能思路。
-
-约束：
-
-- 可以学习其思路与 API 用法，但**不要复制其业务逻辑/架构实现**，避免被其实现方式“带偏”。
-- 除非用户明确要求，否则不要修改 `UptimeFlare/` 目录。
-
----
-
 ## MUST READ FIRST（强制）
 
 在执行任何“写入/重构/生成代码/修改配置/运行破坏性命令”之前，必须先阅读并理解以下文档：
 
 - `AGENTS.md`（本文件）
-- `Application.md`（产品规格与技术约束）
-- `Structure.md`（目录结构与模块边界）
-- `Plan.md`（里程碑与验收标准）
-- `API-Reference.md`（Cloudflare/D1/出站探测等 API 参考）
+- `Develop/Application.md`（产品规格与技术约束）
+- `Develop/Structure.md`（目录结构与模块边界）
+- `Develop/Plan.md`（里程碑与验收标准）
+- `Develop/API-Reference.md`（Cloudflare/D1/出站探测等 API 参考）
 
 如果尚未阅读或内容与当前任务冲突：先停止实现，先对齐文档与需求，再继续。
 
@@ -49,9 +38,9 @@
 
 ## 1. 项目事实（先读这些）
 
-- 产品规格：`Application.md`
-- 目录结构与边界：`Structure.md`
-- 交付计划：`Plan.md`
+- 产品规格：`Develop/Application.md`
+- 目录结构与边界：`Develop/Structure.md`
+- 交付计划：`Develop/Plan.md`
 - 参考项目：`UptimeFlare/`（仅用于查 Cloudflare API/Workers 用法；不要借鉴其架构/实现，更不要复制其业务逻辑）
 
 ---
@@ -70,7 +59,7 @@
 ## 3. 仓库规则（重要）
 
 - 不要修改 `UptimeFlare/` 目录（除非我明确要求）。
-- 所有对外接口必须符合 `Application.md` 的 API 约定（路径、时间字段、错误格式）。
+- 所有对外接口必须符合 `Develop/Application.md` 的 API 约定（路径、时间字段、错误格式）。
 - 所有输入必须用 Zod 做运行时校验；不要信任来自客户端/DB 的 JSON 字段。
 - 所有 DB 写入必须参数化（Drizzle 或 D1 prepared statements），禁止拼接 SQL。
 - 监控探测必须禁用缓存（HTTP check 必须显式 no-store，并设置 `cf.cacheTtlByStatus` 不缓存）。
@@ -79,7 +68,7 @@
 
 ## 4. 实现优先级（MVP）
 
-严格按 `Plan.md` 从 Phase 0 -> Phase 7 推进：
+严格按 `Develop/Plan.md` 从 Phase 0 -> Phase 7 推进：
 
 - 先 Worker + D1 跑通（含 scheduled）再做完整 UI
 - 先 HTTP/TCP 与状态机正确性，再谈多地域与高级分析
@@ -102,7 +91,7 @@
 
 ## 6. 安全基线（必须遵守）
 
-- Monitor target 属于受控 SSRF 能力：必须限制协议，并默认拒绝私网/保留地址段；端口不限制（允许 1-65535）。具体规则以 `Application.md` 为准。
+- Monitor target 属于受控 SSRF 能力：必须限制协议，并默认拒绝私网/保留地址段；端口不限制（允许 1-65535）。具体规则以 `Develop/Application.md` 为准。
 - Admin Token 只能放在 Workers Secrets 或 `.dev.vars`（本地）；禁止写入 Git、D1 或前端代码。
 - Webhook 如启用签名，签名 secret 只能引用 secret（不要落库）。
 

@@ -78,7 +78,7 @@ Uptimer 的通知系统目标：
 
 ## 3. 管理端 API（Admin）
 
-通知渠道相关 API（见 `Application.md` 约定）：
+通知渠道相关 API（见 `Develop/Application.md` 约定）：
 
 - `GET /api/v1/admin/notification-channels`
 - `POST /api/v1/admin/notification-channels`
