@@ -17,7 +17,7 @@ import { DayDowntimeModal } from '../components/DayDowntimeModal';
 import { Markdown } from '../components/Markdown';
 import { MonitorCard } from '../components/MonitorCard';
 import { incidentImpactLabel, incidentStatusLabel } from '../i18n/labels';
-import { formatDateTime } from '../utils/datetime';
+import { formatDateTime, getBrowserTimeZone } from '../utils/datetime';
 import { Badge, Card, MODAL_OVERLAY_CLASS, MODAL_PANEL_CLASS, ThemeToggle } from '../components/ui';
 
 type MaintenanceHistoryPreview = Pick<
@@ -348,7 +348,7 @@ export function StatusPage() {
   });
 
   const derivedTitle = statusQuery.data?.site_title || 'Uptimer';
-  const derivedTimeZone = statusQuery.data?.site_timezone || 'UTC';
+  const derivedTimeZone = getBrowserTimeZone() || statusQuery.data?.site_timezone || 'UTC';
 
   useApplyServerLocaleSetting(statusQuery.data?.site_locale);
 
