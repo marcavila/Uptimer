@@ -192,7 +192,7 @@ const en = {
   'admin_settings.defaults.overview_range': 'Overview default range',
   'admin_settings.defaults.monitor_range': 'Monitor default range',
 
-  'admin_dashboard.title': 'Admin Dashboard',
+  'admin_dashboard.title': '3MW Uptimer',
   'admin_dashboard.tab.monitors': 'Monitors',
   'admin_dashboard.tab.notifications': 'Notifications',
   'admin_dashboard.tab.incidents': 'Incidents',
