@@ -64,6 +64,7 @@ export const monitorState = sqliteTable('monitor_state', {
   lastError: text('last_error'),
   consecutiveFailures: integer('consecutive_failures').notNull().default(0),
   consecutiveSuccesses: integer('consecutive_successes').notNull().default(0),
+  downSince: integer('down_since'),
 });
 
 export const checkResults = sqliteTable(
