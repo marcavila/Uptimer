@@ -46,6 +46,7 @@ type DueMonitorRow = {
   last_changed_at: number | null;
   consecutive_failures: number | null;
   consecutive_successes: number | null;
+  down_since: number | null;
 };
 
 type ActiveWebhookChannelRow = {
@@ -270,7 +271,8 @@ async function listDueMonitors(db: D1Database, checkedAt: number): Promise<DueMo
         s.last_error AS state_last_error,
         s.last_changed_at,
         s.consecutive_failures,
-        s.consecutive_successes
+        s.consecutive_successes,
+        s.down_since
       FROM monitors m
       LEFT JOIN monitor_state s ON s.monitor_id = m.id
       WHERE m.is_active = 1
@@ -312,6 +314,7 @@ async function persistCheckAndState(
   },
   outageAction: 'open' | 'close' | 'update' | 'none',
   stateLastError: string | null,
+  downSince: number | null,
 ): Promise<void> {
   const checkError = outcome.status === 'up' ? null : outcome.error;
 
@@ -354,8 +357,9 @@ async function persistCheckAndState(
         last_latency_ms,
         last_error,
         consecutive_failures,
-        consecutive_successes
-      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        consecutive_successes,
+        down_since
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
       ON CONFLICT(monitor_id) DO UPDATE SET
         status = excluded.status,
         last_checked_at = excluded.last_checked_at,
@@ -363,7 +367,8 @@ async function persistCheckAndState(
         last_latency_ms = excluded.last_latency_ms,
         last_error = excluded.last_error,
         consecutive_failures = excluded.consecutive_failures,
-        consecutive_successes = excluded.consecutive_successes
+        consecutive_successes = excluded.consecutive_successes,
+        down_since = excluded.down_since
     `,
     ).bind(
       monitorId,
@@ -374,6 +379,7 @@ async function persistCheckAndState(
       stateLastError,
       next.consecutiveFailures,
       next.consecutiveSuccesses,
+      downSince,
     ),
   );
 
@@ -493,6 +499,27 @@ async function runDueMonitor(
   const { next, outageAction } = computeNextState(prev, outcome, checkedAt, stateMachineConfig);
   const stateLastError = computeStateLastError(next.status, outcome, row.state_last_error);
 
+  // Track down_since timestamp for duration calculation
+  let downSince: number | null = null;
+  let downtimeDuration: number | null = null;
+
+  if (outageAction === 'open') {
+    // Monitor just went down - record timestamp
+    downSince = checkedAt;
+  } else if (outageAction === 'close') {
+    // Monitor recovered - calculate duration and clear timestamp
+    if (row.down_since !== null) {
+      downtimeDuration = checkedAt - row.down_since;
+    }
+    downSince = null;
+  } else if (outageAction === 'update') {
+    // Monitor still down - preserve existing timestamp
+    downSince = row.down_since;
+  } else {
+    // No outage action - preserve current value
+    downSince = row.down_since;
+  }
+
   await persistCheckAndState(
     env,
     row.id,
@@ -506,6 +533,7 @@ async function runDueMonitor(
     },
     outageAction,
     stateLastError,
+    downSince,
   );
 
   if (!notify || maintenanceSuppressed || !next.changed) {
@@ -545,6 +573,7 @@ async function runDueMonitor(
       error: outcome.error,
       location: null,
     },
+    ...(eventType === 'monitor.up' && downtimeDuration !== null && { downtime_duration: downtimeDuration }),
   };
 
   notify.ctx.waitUntil(
