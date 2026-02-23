@@ -13,7 +13,7 @@ export type MonitorStatus = 'up' | 'down' | 'maintenance' | 'paused' | 'unknown'
 export type CheckStatus = 'up' | 'down' | 'maintenance' | 'unknown';
 export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved';
 export type IncidentImpact = 'none' | 'minor' | 'major' | 'critical';
-export type NotificationChannelType = 'webhook';
+export type NotificationChannelType = 'webhook' | 'google-chat';
 export type NotificationDeliveryStatus = 'success' | 'failed';
 
 export const monitors = sqliteTable(

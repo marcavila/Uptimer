@@ -135,3 +135,10 @@ export const webhookChannelConfigSchema = z
     }
   });
 export type WebhookChannelConfig = z.infer<typeof webhookChannelConfigSchema>;
+
+export const googleChatChannelConfigSchema = z.object({
+  webhook_url: z.string().url(),
+  enabled_events: z.array(notificationEventTypeSchema).min(1).optional(),
+  space_name: z.string().optional(),
+});
+export type GoogleChatChannelConfig = z.infer<typeof googleChatChannelConfigSchema>;
