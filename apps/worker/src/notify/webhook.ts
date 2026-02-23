@@ -3,6 +3,7 @@ import pLimit from 'p-limit';
 import type { WebhookChannelConfig } from '@uptimer/db';
 
 import { claimNotificationDelivery, finalizeNotificationDelivery } from './dedupe';
+import { sendToGoogleChat } from './google-chat';
 import { defaultMessageForEvent, renderJsonTemplate, renderStringTemplate } from './template';
 
 export type WebhookChannel = {
@@ -161,6 +162,7 @@ export async function dispatchWebhookToChannel(args: {
   eventType: string;
   eventKey: string;
   payload: unknown;
+  timezone?: string;
 }): Promise<'sent' | 'skipped'> {
   if (!shouldSendEvent(args.channel.config, args.eventType)) {
     return 'skipped';
@@ -173,6 +175,36 @@ export async function dispatchWebhookToChannel(args: {
   }
 
   const config = args.channel.config;
+
+  // Detect Google Chat webhooks and route to custom handler
+  const isGoogleChat = config.url?.includes('chat.googleapis.com');
+
+  if (isGoogleChat) {
+    let outcome: WebhookDispatchResult;
+    try {
+      const result = await sendToGoogleChat(
+        config.url,
+        args.eventType,
+        args.payload,
+        args.timezone,
+      );
+
+      outcome = result.success
+        ? { status: 'success', httpStatus: result.httpStatus, error: null }
+        : { status: 'failed', httpStatus: result.httpStatus, error: result.error || 'Unknown error' };
+    } catch (err) {
+      outcome = {
+        status: 'failed',
+        httpStatus: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    await finalizeNotificationDelivery(args.db, args.eventKey, args.channel.id, outcome);
+    return 'sent';
+  }
+
+  // Standard webhook processing for non-Google-Chat channels
   const method = config.method.toUpperCase();
   const canHaveBody = method !== 'GET' && method !== 'HEAD';
 
@@ -315,6 +347,7 @@ export async function dispatchWebhookToChannels(args: {
   eventType: string;
   eventKey: string;
   payload: unknown;
+  timezone?: string;
 }): Promise<void> {
   const channels = args.channels.filter((c) => shouldSendEvent(c.config, args.eventType));
   if (channels.length === 0) return;
@@ -330,6 +363,7 @@ export async function dispatchWebhookToChannels(args: {
           eventType: args.eventType,
           eventKey: args.eventKey,
           payload: args.payload,
+          timezone: args.timezone,
         }).catch((err) => Promise.reject({ channel, err })),
       ),
     ),

@@ -584,6 +584,7 @@ async function runDueMonitor(
       eventType,
       eventKey,
       payload,
+      timezone: settings.site_timezone,
     }).catch((err) => {
       console.error('notify: failed to dispatch webhooks', err);
     }),
@@ -649,6 +650,7 @@ export async function runScheduledTick(env: Env, ctx: ExecutionContext): Promise
           eventType,
           eventKey,
           payload,
+          timezone: settings.site_timezone,
         }).catch((err) => {
           console.error('notify: failed to dispatch maintenance.started', err);
         }),
@@ -676,6 +678,7 @@ export async function runScheduledTick(env: Env, ctx: ExecutionContext): Promise
           eventType,
           eventKey,
           payload,
+          timezone: settings.site_timezone,
         }).catch((err) => {
           console.error('notify: failed to dispatch maintenance.ended', err);
         }),
